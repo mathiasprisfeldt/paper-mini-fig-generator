@@ -29,8 +29,11 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
+      - name: Type check
+        run: yarn tsc -b
+
       - name: Build with PR base path
-        run: yarn build --base /paper-mini-fig-generator/pr/${{ github.event.pull_request.number }}/
+        run: yarn vite build --base /paper-mini-fig-generator/pr/${{ github.event.pull_request.number }}/
 
       - name: Deploy PR preview
         uses: peaceiris/actions-gh-pages@v4
