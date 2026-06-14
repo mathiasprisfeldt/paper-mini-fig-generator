@@ -285,57 +285,6 @@ function drawMiniFigToCanvas(
 
 // --- PDF rendering ---
 
-function renderFlippedImageToDataUrl(img: HTMLImageElement): string {
-  const canvas = document.createElement("canvas");
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  const ctx = canvas.getContext("2d")!;
-  ctx.translate(0, img.naturalHeight);
-  ctx.scale(1, -1);
-  ctx.drawImage(img, 0, 0);
-  return canvas.toDataURL("image/png");
-}
-
-function renderPdfBand(
-  img: HTMLImageElement,
-  bandH: number,
-  flipped: boolean,
-  labels: { text: string; hPx: number; fontSize: number }[]
-): string {
-  const w = WIDTH_PX;
-  const blur = renderBlurredStrip(img, w, bandH, "bottom");
-
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = bandH;
-  const ctx = canvas.getContext("2d")!;
-
-  if (flipped) {
-    ctx.translate(0, bandH);
-    ctx.scale(1, -1);
-  }
-  ctx.drawImage(blur, 0, 0);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-  // Top band: spacer → labels → gap. Bottom band: gap → labels → spacer.
-  const hasLabels = labels.length > 0;
-  let y = flipped ? BUFFER_PX : (hasLabels ? GAP_PX : 0);
-  for (const label of labels) {
-    if (flipped) {
-      ctx.save();
-      ctx.translate(w, y + label.hPx);
-      ctx.scale(-1, -1);
-      drawTextOnCtx(ctx, label.text, 0, 0, w, label.hPx, label.fontSize);
-      ctx.restore();
-    } else {
-      drawTextOnCtx(ctx, label.text, 0, y, w, label.hPx, label.fontSize);
-    }
-    y += label.hPx;
-  }
-
-  return canvas.toDataURL("image/png");
-}
-
 interface MiniPdfData {
   img: HTMLImageElement;
   name: string;
@@ -346,50 +295,11 @@ interface MiniPdfData {
 
 function drawMiniToPdf(pdf: jsPDF, mini: MiniPdfData, ox: number, oy: number) {
   const { img, name, showName, number } = mini;
-  const hasNumber = number != null;
-  const hasName = showName && !!name;
-  const imgHMm = imageHeightMm(img);
 
-  const backDataUrl = renderFlippedImageToDataUrl(img);
-  const tmpCtx = document.createElement("canvas").getContext("2d")!;
-
-  // Build label list for top (number first, then name — outermost to innermost)
-  const topLabels: { text: string; hPx: number; fontSize: number }[] = [];
-  if (hasNumber) topLabels.push({ text: `${number}`, hPx: NUMBER_PX, fontSize: NUMBER_PX * 0.85 });
-  if (hasName) topLabels.push({ text: name, hPx: LABEL_PX, fontSize: fitCanvasFontSize(tmpCtx, name, WIDTH_PX * 0.9, LABEL_PX * 0.7) });
-
-  // Build label list for bottom (name first, then number — innermost to outermost)
-  const botLabels: { text: string; hPx: number; fontSize: number }[] = [];
-  if (hasName) botLabels.push({ text: name, hPx: LABEL_PX, fontSize: fitCanvasFontSize(tmpCtx, name, WIDTH_PX * 0.9, LABEL_PX * 0.7) });
-  if (hasNumber) botLabels.push({ text: `${number}`, hPx: NUMBER_PX, fontSize: NUMBER_PX * 0.85 });
-
-  let labelsPx = 0;
-  const hasAnyLabel = hasName || hasNumber;
-  if (hasAnyLabel) labelsPx += GAP_PX;
-  if (hasName) labelsPx += LABEL_PX;
-  if (hasNumber) labelsPx += NUMBER_PX;
-  const bandH = BUFFER_PX + labelsPx;
-  const bandMm = STAND_BUFFER_MM + (hasAnyLabel ? LABEL_GAP_MM : 0) + (hasName ? LABEL_HEIGHT_MM : 0) + (hasNumber ? NUMBER_HEIGHT_MM : 0);
-
-  let y = oy;
-
-  // Top band (one single blurred piece, flipped)
-  const topUrl = renderPdfBand(img, bandH, true, topLabels);
-  pdf.addImage(topUrl, "PNG", ox, y, MINI_WIDTH_MM, bandMm);
-  y += bandMm;
-
-  // Mirrored image
-  pdf.addImage(backDataUrl, "PNG", ox, y, MINI_WIDTH_MM, imgHMm);
-  y += imgHMm;
-
-  // Front image
-  pdf.addImage(img, "PNG", ox, y, MINI_WIDTH_MM, imgHMm);
-  y += imgHMm;
-
-  // Bottom band (one single blurred piece)
-  const botUrl = renderPdfBand(img, bandH, false, botLabels);
-  pdf.addImage(botUrl, "PNG", ox, y, MINI_WIDTH_MM, bandMm);
-  y += bandMm;
+  // Use the same canvas renderer as the preview to get consistent blur fades
+  const canvas = drawMiniFigToCanvas(img, name, showName, number);
+  const dataUrl = canvas.toDataURL("image/png");
+  pdf.addImage(dataUrl, "PNG", ox, oy, MINI_WIDTH_MM, mini.heightMm);
 }
 
 export async function generatePdf(entries: MiniFigEntry[]): Promise<void> {
