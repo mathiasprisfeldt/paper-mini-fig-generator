@@ -56,6 +56,7 @@ jobs:
             });
 
             const botComment = comments.data.find(comment =>
+              comment.user.login === 'github-actions[bot]' &&
               comment.body.includes('Preview deployment ready!')
             );
 
