@@ -1,73 +1,48 @@
-# React + TypeScript + Vite
+# Paper Mini Fig Generator
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+[![Deploy to GitHub Pages](https://github.com/mathiasprisfeldt/paper-mini-fig-generator/actions/workflows/deploy.yml/badge.svg)](https://github.com/mathiasprisfeldt/paper-mini-fig-generator/actions/workflows/deploy.yml)
 
-Currently, two official plugins are available:
+**[▶ Try it live](https://mathiasprisfeldt.github.io/paper-mini-fig-generator/)**
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+A web-based tool for creating printable 28mm paper miniatures for tabletop games. Upload images, configure your miniatures, and generate a ready-to-print A4 PDF with properly scaled figures and square bases.
 
-## React Compiler
+## Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Upload custom images for each miniature
+- Set quantity per miniature to batch-print duplicates
+- Optional name labels on each figure
+- Live preview of your miniatures
+- Generates a print-ready A4 PDF with 28mm-scale figures
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Prerequisites
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- Node.js 20+
+- Yarn (via Corepack)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Installation
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+corepack enable
+yarn install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+yarn dev
 ```
+
+### Build
+
+```bash
+yarn build
+```
+
+## Tech Stack
+
+- React 19
+- TypeScript
+- Vite
+- jsPDF for PDF generation
