@@ -29,7 +29,7 @@ async function ensureJsPdfFont(pdf: jsPDF) {
 const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
 const PAGE_MARGIN_MM = 10;
-const SPACING_MM = 3;
+const SPACING_MM = 0;
 
 const MINI_WIDTH_MM = 28;
 const LABEL_HEIGHT_MM = 6;
@@ -417,6 +417,9 @@ export async function generatePdf(entries: MiniFigEntry[]): Promise<void> {
       });
     }
   }
+
+  // Sort by name/creature so identical types are grouped together
+  allMinis.sort((a, b) => a.name.localeCompare(b.name));
 
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   await ensureJsPdfFont(pdf);
