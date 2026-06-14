@@ -5,3 +5,11 @@ export interface MiniFigEntry {
   quantity: number;
   showName: boolean;
 }
+
+export interface Catalogue {
+  id: string;
+  name: string;
+  entries: MiniFigEntry[];
+  createdAt: number;
+  updatedAt: number;
+}
