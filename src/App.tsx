@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { MiniFigEntry, Catalogue } from "./types";
 import { MiniFigForm } from "./components/MiniFigForm";
 import { MiniFigPreview } from "./components/MiniFigPreview";
@@ -37,10 +37,11 @@ function App() {
     string | null
   >(() => {
     const savedId = getActiveCatalogueId();
+    // Reuse catalogues initializer logic: if saved was empty, a default was created
+    // so we just check against what we'd return from the catalogues initializer
     const saved = loadCatalogues();
     if (savedId && saved.some((c) => c.id === savedId)) return savedId;
     if (saved.length > 0) return saved[0].id;
-    // If we created a default catalogue above, we won't have its id from saved
     return null;
   });
 
@@ -53,14 +54,7 @@ function App() {
         : null;
 
   // Persist catalogues whenever they change
-  const isInitialMount = useRef(true);
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      // Save on initial mount too (handles default catalogue creation)
-      saveCatalogues(catalogues);
-      return;
-    }
     saveCatalogues(catalogues);
   }, [catalogues]);
 

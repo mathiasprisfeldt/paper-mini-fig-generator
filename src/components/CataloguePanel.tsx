@@ -77,7 +77,10 @@ export function CataloguePanel({
                 onBlur={commitRename}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") commitRename();
-                  if (e.key === "Escape") setEditingId(null);
+                  if (e.key === "Escape") {
+                    setEditingId(null);
+                    setEditName("");
+                  }
                 }}
                 autoFocus
               />
