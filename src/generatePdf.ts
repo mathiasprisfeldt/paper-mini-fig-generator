@@ -50,9 +50,9 @@ const CREATURE_SIZE_MULTIPLIERS: Record<CreatureSize, number> = {
   tiny: 0.5,
   small: 1,
   medium: 1,
-  large: 2,
-  huge: 3,
-  gargantuan: 4,
+  large: 1.5,
+  huge: 2,
+  gargantuan: 3,
 };
 
 function getEffectiveWidthMm(entry: MiniFigEntry): number {
