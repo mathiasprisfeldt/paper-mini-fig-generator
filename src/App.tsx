@@ -20,6 +20,8 @@ function createEntry(): MiniFigEntry {
     imageDataUrl: null,
     quantity: 1,
     showName: true,
+    miniSize: 28,
+    creatureSize: "medium",
   };
 }
 
@@ -213,7 +215,7 @@ function App() {
                     {totalMinis} mini{totalMinis !== 1 ? "s" : ""} total
                   </span>
                   <span className="dot">·</span>
-                  <span>28mm · Square base · A4 PDF</span>
+                  <span>Square base · A4 PDF</span>
                 </div>
                 <button
                   className="btn btn-primary btn-large"

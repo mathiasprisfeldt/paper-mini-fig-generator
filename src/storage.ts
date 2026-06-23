@@ -3,11 +3,24 @@ import type { Catalogue, MiniFigEntry } from "./types";
 const CATALOGUES_KEY = "paper-mini-fig-catalogues";
 const ACTIVE_CATALOGUE_KEY = "paper-mini-fig-active-catalogue";
 
+function migrateEntry(e: unknown): MiniFigEntry {
+  const entry = e as MiniFigEntry;
+  return {
+    ...entry,
+    miniSize: entry.miniSize ?? 28,
+    creatureSize: entry.creatureSize ?? "medium",
+  };
+}
+
 export function loadCatalogues(): Catalogue[] {
   try {
     const raw = localStorage.getItem(CATALOGUES_KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as Catalogue[];
+    const catalogues = JSON.parse(raw) as Catalogue[];
+    return catalogues.map((c) => ({
+      ...c,
+      entries: c.entries.map(migrateEntry),
+    }));
   } catch {
     return [];
   }

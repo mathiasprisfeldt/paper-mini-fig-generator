@@ -1,11 +1,22 @@
 import { useCallback, useRef } from "react";
-import type { MiniFigEntry } from "../types";
+import type { MiniFigEntry, MiniSize, CreatureSize } from "../types";
 
 interface Props {
   entry: MiniFigEntry;
   onUpdate: (patch: Partial<MiniFigEntry>) => void;
   onRemove?: () => void;
 }
+
+const MINI_SIZES: MiniSize[] = [24, 28, 32];
+
+const CREATURE_SIZES: { value: CreatureSize; label: string }[] = [
+  { value: "tiny", label: "Tiny" },
+  { value: "small", label: "Small" },
+  { value: "medium", label: "Medium" },
+  { value: "large", label: "Large" },
+  { value: "huge", label: "Huge" },
+  { value: "gargantuan", label: "Gargantuan" },
+];
 
 export function MiniFigForm({ entry, onUpdate, onRemove }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -86,6 +97,38 @@ export function MiniFigForm({ entry, onUpdate, onRemove }: Props) {
               onUpdate({ quantity: Math.max(1, parseInt(e.target.value) || 1) })
             }
           />
+        </div>
+
+        <div className="field">
+          <label>Size</label>
+          <select
+            value={entry.creatureSize}
+            onChange={(e) =>
+              onUpdate({ creatureSize: e.target.value as CreatureSize })
+            }
+          >
+            {CREATURE_SIZES.map(({ value, label }) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field">
+          <label>Scale</label>
+          <select
+            value={entry.miniSize}
+            onChange={(e) =>
+              onUpdate({ miniSize: parseInt(e.target.value) as MiniSize })
+            }
+          >
+            {MINI_SIZES.map((s) => (
+              <option key={s} value={s}>
+                {s}mm
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="field field-toggle">

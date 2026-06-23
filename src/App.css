@@ -136,7 +136,8 @@
 }
 
 .field input[type="text"],
-.field input[type="number"] {
+.field input[type="number"],
+.field select {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -147,11 +148,16 @@
   transition: border-color 0.15s;
 }
 
+.field select {
+  cursor: pointer;
+}
+
 .field input[type="number"] {
   width: 70px;
 }
 
-.field input:focus {
+.field input:focus,
+.field select:focus {
   border-color: var(--accent);
 }
 

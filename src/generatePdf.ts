@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import type { MiniFigEntry } from "./types";
+import type { MiniFigEntry, CreatureSize } from "./types";
 
 const FONT_FAMILY = "MedievalSharp, serif";
 const FONT_URL =
@@ -31,14 +31,12 @@ const A4_HEIGHT_MM = 297;
 const PAGE_MARGIN_MM = 10;
 const SPACING_MM = 0;
 
-const MINI_WIDTH_MM = 28;
 const LABEL_HEIGHT_MM = 6;
 const NUMBER_HEIGHT_MM = 10;
 const STAND_BUFFER_MM = 10;
 const LABEL_GAP_MM = 2;
 
 const SCALE = 12;
-const WIDTH_PX = MINI_WIDTH_MM * SCALE;
 const LABEL_PX = LABEL_HEIGHT_MM * SCALE;
 const NUMBER_PX = NUMBER_HEIGHT_MM * SCALE;
 const BUFFER_PX = STAND_BUFFER_MM * SCALE;
@@ -48,16 +46,30 @@ const BLUR_PASSES = 3;
 const BLUR_DOWNSCALE = 8;
 const OVERLAY_ALPHA = 0.3;
 
-function imageHeightMm(img: HTMLImageElement): number {
-  return MINI_WIDTH_MM * (img.height / img.width);
+const CREATURE_SIZE_MULTIPLIERS: Record<CreatureSize, number> = {
+  tiny: 0.5,
+  small: 1,
+  medium: 1,
+  large: 2,
+  huge: 3,
+  gargantuan: 4,
+};
+
+function getEffectiveWidthMm(entry: MiniFigEntry): number {
+  return entry.miniSize * CREATURE_SIZE_MULTIPLIERS[entry.creatureSize];
+}
+
+function imageHeightMm(img: HTMLImageElement, widthMm: number): number {
+  return widthMm * (img.height / img.width);
 }
 
 function miniHeightMm(
   img: HTMLImageElement,
+  widthMm: number,
   showName: boolean,
   hasNumber: boolean
 ): number {
-  const imgH = imageHeightMm(img);
+  const imgH = imageHeightMm(img, widthMm);
   let labels = 0;
   if (showName || hasNumber) labels += LABEL_GAP_MM;
   if (showName) labels += LABEL_HEIGHT_MM;
@@ -178,11 +190,13 @@ function drawMiniFigToCanvas(
   img: HTMLImageElement,
   name: string,
   showName: boolean,
-  number: number | null
+  number: number | null,
+  widthMm: number
 ): HTMLCanvasElement {
+  const widthPx = Math.round(widthMm * SCALE);
   const hasNumber = number != null;
   const hasName = showName && !!name;
-  const imgPx = Math.round(WIDTH_PX * (img.height / img.width));
+  const imgPx = Math.round(widthPx * (img.height / img.width));
 
   let labels = 0;
   if (hasName || hasNumber) labels += GAP_PX;
@@ -190,7 +204,7 @@ function drawMiniFigToCanvas(
   if (hasNumber) labels += NUMBER_PX;
   const bandH = BUFFER_PX + labels;
 
-  const totalW = WIDTH_PX;
+  const totalW = widthPx;
   const totalH = bandH + imgPx * 2 + bandH;
   const fadeZone = Math.round(imgPx * 0.2);
 
@@ -298,11 +312,12 @@ function renderFlippedImageToDataUrl(img: HTMLImageElement): string {
 
 function renderPdfBand(
   img: HTMLImageElement,
+  widthMm: number,
   bandH: number,
   flipped: boolean,
   labels: { text: string; hPx: number; fontSize: number }[]
 ): string {
-  const w = WIDTH_PX;
+  const w = Math.round(widthMm * SCALE);
   const blur = renderBlurredStrip(img, w, bandH, "bottom");
 
   const canvas = document.createElement("canvas");
@@ -342,13 +357,15 @@ interface MiniPdfData {
   showName: boolean;
   number: number | null;
   heightMm: number;
+  widthMm: number;
 }
 
 function drawMiniToPdf(pdf: jsPDF, mini: MiniPdfData, ox: number, oy: number) {
-  const { img, name, showName, number } = mini;
+  const { img, name, showName, number, widthMm } = mini;
+  const widthPx = Math.round(widthMm * SCALE);
   const hasNumber = number != null;
   const hasName = showName && !!name;
-  const imgHMm = imageHeightMm(img);
+  const imgHMm = imageHeightMm(img, widthMm);
 
   const backDataUrl = renderFlippedImageToDataUrl(img);
   const tmpCtx = document.createElement("canvas").getContext("2d")!;
@@ -356,11 +373,11 @@ function drawMiniToPdf(pdf: jsPDF, mini: MiniPdfData, ox: number, oy: number) {
   // Build label list for top (number first, then name — outermost to innermost)
   const topLabels: { text: string; hPx: number; fontSize: number }[] = [];
   if (hasNumber) topLabels.push({ text: `${number}`, hPx: NUMBER_PX, fontSize: NUMBER_PX * 0.85 });
-  if (hasName) topLabels.push({ text: name, hPx: LABEL_PX, fontSize: fitCanvasFontSize(tmpCtx, name, WIDTH_PX * 0.9, LABEL_PX * 0.7) });
+  if (hasName) topLabels.push({ text: name, hPx: LABEL_PX, fontSize: fitCanvasFontSize(tmpCtx, name, widthPx * 0.9, LABEL_PX * 0.7) });
 
   // Build label list for bottom (name first, then number — innermost to outermost)
   const botLabels: { text: string; hPx: number; fontSize: number }[] = [];
-  if (hasName) botLabels.push({ text: name, hPx: LABEL_PX, fontSize: fitCanvasFontSize(tmpCtx, name, WIDTH_PX * 0.9, LABEL_PX * 0.7) });
+  if (hasName) botLabels.push({ text: name, hPx: LABEL_PX, fontSize: fitCanvasFontSize(tmpCtx, name, widthPx * 0.9, LABEL_PX * 0.7) });
   if (hasNumber) botLabels.push({ text: `${number}`, hPx: NUMBER_PX, fontSize: NUMBER_PX * 0.85 });
 
   let labelsPx = 0;
@@ -374,22 +391,21 @@ function drawMiniToPdf(pdf: jsPDF, mini: MiniPdfData, ox: number, oy: number) {
   let y = oy;
 
   // Top band (one single blurred piece, flipped)
-  const topUrl = renderPdfBand(img, bandH, true, topLabels);
-  pdf.addImage(topUrl, "PNG", ox, y, MINI_WIDTH_MM, bandMm);
+  const topUrl = renderPdfBand(img, widthMm, bandH, true, topLabels);
+  pdf.addImage(topUrl, "PNG", ox, y, widthMm, bandMm);
   y += bandMm;
 
   // Mirrored image
-  pdf.addImage(backDataUrl, "PNG", ox, y, MINI_WIDTH_MM, imgHMm);
+  pdf.addImage(backDataUrl, "PNG", ox, y, widthMm, imgHMm);
   y += imgHMm;
 
   // Front image
-  pdf.addImage(img, "PNG", ox, y, MINI_WIDTH_MM, imgHMm);
+  pdf.addImage(img, "PNG", ox, y, widthMm, imgHMm);
   y += imgHMm;
 
   // Bottom band (one single blurred piece)
-  const botUrl = renderPdfBand(img, bandH, false, botLabels);
-  pdf.addImage(botUrl, "PNG", ox, y, MINI_WIDTH_MM, bandMm);
-  y += bandMm;
+  const botUrl = renderPdfBand(img, widthMm, bandH, false, botLabels);
+  pdf.addImage(botUrl, "PNG", ox, y, widthMm, bandMm);
 }
 
 export async function generatePdf(entries: MiniFigEntry[]): Promise<void> {
@@ -401,10 +417,12 @@ export async function generatePdf(entries: MiniFigEntry[]): Promise<void> {
 
   for (const entry of validEntries) {
     const img = await loadImage(entry.imageDataUrl!);
+    const widthMm = getEffectiveWidthMm(entry);
     for (let i = 0; i < entry.quantity; i++) {
       const number = entry.quantity > 1 ? i + 1 : null;
       const heightMm = miniHeightMm(
         img,
+        widthMm,
         entry.showName && !!entry.name,
         number != null
       );
@@ -414,6 +432,7 @@ export async function generatePdf(entries: MiniFigEntry[]): Promise<void> {
         showName: entry.showName,
         number,
         heightMm,
+        widthMm,
       });
     }
   }
@@ -431,7 +450,7 @@ export async function generatePdf(entries: MiniFigEntry[]): Promise<void> {
   for (let i = 0; i < allMinis.length; i++) {
     const mini = allMinis[i];
 
-    if (pageX + MINI_WIDTH_MM > A4_WIDTH_MM - PAGE_MARGIN_MM) {
+    if (pageX + mini.widthMm > A4_WIDTH_MM - PAGE_MARGIN_MM) {
       pageX = PAGE_MARGIN_MM;
       pageY += rowMaxH + SPACING_MM;
       rowMaxH = 0;
@@ -448,7 +467,7 @@ export async function generatePdf(entries: MiniFigEntry[]): Promise<void> {
     drawMiniToPdf(pdf, mini, pageX, pageY);
 
     if (mini.heightMm > rowMaxH) rowMaxH = mini.heightMm;
-    pageX += MINI_WIDTH_MM + SPACING_MM;
+    pageX += mini.widthMm + SPACING_MM;
   }
 
   pdf.save("paper-minis.pdf");
@@ -461,6 +480,7 @@ export async function renderPreview(
   await fontReady;
   if (!entry.imageDataUrl) return "";
   const img = await loadImage(entry.imageDataUrl);
-  const canvas = drawMiniFigToCanvas(img, entry.name, entry.showName, number);
+  const widthMm = getEffectiveWidthMm(entry);
+  const canvas = drawMiniFigToCanvas(img, entry.name, entry.showName, number, widthMm);
   return canvas.toDataURL("image/png");
 }
