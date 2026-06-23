@@ -1,15 +1,24 @@
-import type { Catalogue, MiniFigEntry } from "./types";
+import type { Catalogue, CreatureSize, MiniFigEntry, MiniSize } from "./types";
 
 const CATALOGUES_KEY = "paper-mini-fig-catalogues";
 const ACTIVE_CATALOGUE_KEY = "paper-mini-fig-active-catalogue";
 
+const VALID_MINI_SIZES: MiniSize[] = [24, 28, 32];
+const VALID_CREATURE_SIZES: CreatureSize[] = [
+  "tiny", "small", "medium", "large", "huge", "gargantuan",
+];
+
 function migrateEntry(e: unknown): MiniFigEntry {
-  const entry = e as MiniFigEntry;
-  return {
-    ...entry,
-    miniSize: entry.miniSize ?? 28,
-    creatureSize: entry.creatureSize ?? "medium",
-  };
+  const raw = e as Record<string, unknown>;
+  const miniSize: MiniSize = VALID_MINI_SIZES.includes(raw.miniSize as MiniSize)
+    ? (raw.miniSize as MiniSize)
+    : 28;
+  const creatureSize: CreatureSize = VALID_CREATURE_SIZES.includes(
+    raw.creatureSize as CreatureSize
+  )
+    ? (raw.creatureSize as CreatureSize)
+    : "medium";
+  return { ...(raw as unknown as MiniFigEntry), miniSize, creatureSize };
 }
 
 export function loadCatalogues(): Catalogue[] {

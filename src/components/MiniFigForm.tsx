@@ -119,9 +119,12 @@ export function MiniFigForm({ entry, onUpdate, onRemove }: Props) {
           <label>Scale</label>
           <select
             value={entry.miniSize}
-            onChange={(e) =>
-              onUpdate({ miniSize: parseInt(e.target.value) as MiniSize })
-            }
+            onChange={(e) => {
+              const val = parseInt(e.target.value);
+              const size: MiniSize =
+                val === 24 || val === 28 || val === 32 ? val : 28;
+              onUpdate({ miniSize: size });
+            }}
           >
             {MINI_SIZES.map((s) => (
               <option key={s} value={s}>
