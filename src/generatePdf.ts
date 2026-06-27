@@ -51,17 +51,18 @@ const BLUR_PASSES = 3;
 const BLUR_DOWNSCALE = 8;
 const OVERLAY_ALPHA = 0.3;
 
-// Multipliers scale the base miniSize to the creature's footprint.
-// D&D 5e base sizes in 5ft squares: tiny=0.5, small/medium=1, large=2,
-// huge=3, gargantuan=4. The larger categories are reduced to fit within
-// A4/A3 page bounds (large: 2→1.5, huge: 3→2, gargantuan: 4→3).
+// Multipliers scale the base miniSize to the creature's tile footprint.
+// D&D 5e: 1 tile = 5 ft. For a Medium creature at miniSize mm scale,
+// each tile is miniSize mm wide. Footprints in tiles:
+// tiny=0.5 (2.5ft), small/medium=1 (5ft), large=2 (10ft),
+// huge=3 (15ft), gargantuan=4 (20ft).
 const CREATURE_SIZE_MULTIPLIERS: Record<CreatureSize, number> = {
   tiny: 0.5,
   small: 1,
   medium: 1,
-  large: 1.5,
-  huge: 2,
-  gargantuan: 3,
+  large: 2,
+  huge: 3,
+  gargantuan: 4,
 };
 
 function getEffectiveWidthMm(entry: MiniFigEntry): number {
