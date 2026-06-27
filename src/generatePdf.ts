@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import type { MiniFigEntry, CreatureSize } from "./types";
+import type { MiniFigEntry, CreatureSize, PaperFormat } from "./types";
 
 const FONT_FAMILY = "MedievalSharp, serif";
 const FONT_URL =
@@ -31,6 +31,11 @@ const A4_HEIGHT_MM = 297;
 const PAGE_MARGIN_MM = 10;
 const SPACING_MM = 0;
 
+const PAPER_SIZES: Record<PaperFormat, { widthMm: number; heightMm: number }> = {
+  a4: { widthMm: A4_WIDTH_MM, heightMm: A4_HEIGHT_MM },
+  a3: { widthMm: 297, heightMm: 420 },
+};
+
 const LABEL_HEIGHT_MM = 6;
 const NUMBER_HEIGHT_MM = 10;
 const STAND_BUFFER_MM = 10;
@@ -46,6 +51,10 @@ const BLUR_PASSES = 3;
 const BLUR_DOWNSCALE = 8;
 const OVERLAY_ALPHA = 0.3;
 
+// Multipliers scale the base miniSize to the creature's footprint.
+// D&D 5e base sizes in 5ft squares: tiny=0.5, small/medium=1, large=2,
+// huge=3, gargantuan=4. The larger categories are reduced to fit within
+// A4/A3 page bounds (large: 2→1.5, huge: 3→2, gargantuan: 4→3).
 const CREATURE_SIZE_MULTIPLIERS: Record<CreatureSize, number> = {
   tiny: 0.5,
   small: 1,
@@ -57,6 +66,14 @@ const CREATURE_SIZE_MULTIPLIERS: Record<CreatureSize, number> = {
 
 function getEffectiveWidthMm(entry: MiniFigEntry): number {
   return entry.miniSize * CREATURE_SIZE_MULTIPLIERS[entry.creatureSize];
+}
+
+export function getUsablePageWidthMm(format: PaperFormat): number {
+  return PAPER_SIZES[format].widthMm - PAGE_MARGIN_MM * 2;
+}
+
+export function isEntryOversized(entry: MiniFigEntry, format: PaperFormat): boolean {
+  return getEffectiveWidthMm(entry) > getUsablePageWidthMm(format);
 }
 
 function imageHeightMm(img: HTMLImageElement, widthMm: number): number {
@@ -408,10 +425,14 @@ function drawMiniToPdf(pdf: jsPDF, mini: MiniPdfData, ox: number, oy: number) {
   pdf.addImage(botUrl, "PNG", ox, y, widthMm, bandMm);
 }
 
-export async function generatePdf(entries: MiniFigEntry[]): Promise<void> {
+export async function generatePdf(entries: MiniFigEntry[], format: PaperFormat = "a4"): Promise<void> {
   await fontReady;
   const validEntries = entries.filter((e) => e.imageDataUrl);
   if (validEntries.length === 0) return;
+
+  const { widthMm: pageW, heightMm: pageH } = PAPER_SIZES[format];
+  const usableW = pageW - PAGE_MARGIN_MM * 2;
+  const usableH = pageH - PAGE_MARGIN_MM * 2;
 
   const allMinis: MiniPdfData[] = [];
 
@@ -440,7 +461,7 @@ export async function generatePdf(entries: MiniFigEntry[]): Promise<void> {
   // Sort by name/creature so identical types are grouped together
   allMinis.sort((a, b) => a.name.localeCompare(b.name));
 
-  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format });
   await ensureJsPdfFont(pdf);
 
   let pageX = PAGE_MARGIN_MM;
@@ -450,13 +471,13 @@ export async function generatePdf(entries: MiniFigEntry[]): Promise<void> {
   for (let i = 0; i < allMinis.length; i++) {
     const mini = allMinis[i];
 
-    if (pageX + mini.widthMm > A4_WIDTH_MM - PAGE_MARGIN_MM) {
+    if (pageX + mini.widthMm > usableW + PAGE_MARGIN_MM) {
       pageX = PAGE_MARGIN_MM;
       pageY += rowMaxH + SPACING_MM;
       rowMaxH = 0;
     }
 
-    if (pageY + mini.heightMm > A4_HEIGHT_MM - PAGE_MARGIN_MM) {
+    if (pageY + mini.heightMm > usableH + PAGE_MARGIN_MM) {
       pdf.addPage();
       await ensureJsPdfFont(pdf);
       pageX = PAGE_MARGIN_MM;

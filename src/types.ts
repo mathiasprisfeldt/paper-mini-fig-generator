@@ -1,5 +1,7 @@
 export type MiniSize = 24 | 28 | 32;
 
+export type PaperFormat = "a4" | "a3";
+
 export type CreatureSize =
   | "tiny"
   | "small"

@@ -317,6 +317,12 @@
 .export-section {
   margin-top: 2rem;
   display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.export-controls {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   background: var(--surface);
@@ -335,6 +341,52 @@
 
 .export-info .dot {
   color: var(--border);
+}
+
+.format-picker {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.format-btn {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.format-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.format-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.oversized-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  border-radius: var(--radius);
+  padding: 0.65rem 1rem;
+  font-size: 0.85rem;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.oversized-notice-icon {
+  flex-shrink: 0;
+  line-height: 1.4;
 }
 
 @media (max-width: 640px) {
@@ -364,6 +416,10 @@
   }
 
   .export-section {
+    gap: 0.5rem;
+  }
+
+  .export-controls {
     flex-direction: column;
     gap: 1rem;
     text-align: center;
