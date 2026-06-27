@@ -425,7 +425,7 @@ function drawMiniToPdf(pdf: jsPDF, mini: MiniPdfData, ox: number, oy: number) {
   pdf.addImage(botUrl, "PNG", ox, y, widthMm, bandMm);
 }
 
-export async function generatePdf(entries: MiniFigEntry[], format: PaperFormat = "a4"): Promise<void> {
+export async function generatePdf(entries: MiniFigEntry[], format: PaperFormat = "a4", catalogueName = "paper-minis"): Promise<void> {
   await fontReady;
   const validEntries = entries.filter((e) => e.imageDataUrl);
   if (validEntries.length === 0) return;
@@ -491,7 +491,8 @@ export async function generatePdf(entries: MiniFigEntry[], format: PaperFormat =
     pageX += mini.widthMm + SPACING_MM;
   }
 
-  pdf.save("paper-minis.pdf");
+  const safeName = catalogueName.replace(/[^a-z0-9_\-\s]/gi, "").trim() || "paper-minis";
+  pdf.save(`${safeName}.pdf`);
 }
 
 export async function renderPreview(

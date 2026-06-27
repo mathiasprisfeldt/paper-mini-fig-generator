@@ -120,7 +120,7 @@ function App() {
     if (valid.length === 0) return;
     setGenerating(true);
     try {
-      await generatePdf(entries, paperFormat);
+      await generatePdf(entries, paperFormat, activeCatalogue?.name);
     } finally {
       setGenerating(false);
     }
