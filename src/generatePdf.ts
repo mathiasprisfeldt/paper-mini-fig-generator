@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import type { MiniFigEntry } from "./types";
+import type { MiniFigEntry, CreatureSize, PaperFormat } from "./types";
 
 const FONT_FAMILY = "MedievalSharp, serif";
 const FONT_URL =
@@ -31,14 +31,17 @@ const A4_HEIGHT_MM = 297;
 const PAGE_MARGIN_MM = 10;
 const SPACING_MM = 0;
 
-const MINI_WIDTH_MM = 28;
+const PAPER_SIZES: Record<PaperFormat, { widthMm: number; heightMm: number }> = {
+  a4: { widthMm: A4_WIDTH_MM, heightMm: A4_HEIGHT_MM },
+  a3: { widthMm: 297, heightMm: 420 },
+};
+
 const LABEL_HEIGHT_MM = 6;
 const NUMBER_HEIGHT_MM = 10;
 const STAND_BUFFER_MM = 10;
 const LABEL_GAP_MM = 2;
 
 const SCALE = 12;
-const WIDTH_PX = MINI_WIDTH_MM * SCALE;
 const LABEL_PX = LABEL_HEIGHT_MM * SCALE;
 const NUMBER_PX = NUMBER_HEIGHT_MM * SCALE;
 const BUFFER_PX = STAND_BUFFER_MM * SCALE;
@@ -48,16 +51,43 @@ const BLUR_PASSES = 3;
 const BLUR_DOWNSCALE = 8;
 const OVERLAY_ALPHA = 0.3;
 
-function imageHeightMm(img: HTMLImageElement): number {
-  return MINI_WIDTH_MM * (img.height / img.width);
+// Multipliers scale the base miniSize to the creature's tile footprint.
+// D&D 5e: 1 tile = 5 ft. For a Medium creature at miniSize mm scale,
+// each tile is miniSize mm wide. Footprints in tiles:
+// tiny=0.5 (2.5ft), small/medium=1 (5ft), large=2 (10ft),
+// huge=3 (15ft), gargantuan=4 (20ft).
+const CREATURE_SIZE_MULTIPLIERS: Record<CreatureSize, number> = {
+  tiny: 0.5,
+  small: 1,
+  medium: 1,
+  large: 2,
+  huge: 3,
+  gargantuan: 4,
+};
+
+function getEffectiveWidthMm(entry: MiniFigEntry): number {
+  return entry.miniSize * CREATURE_SIZE_MULTIPLIERS[entry.creatureSize];
+}
+
+export function getUsablePageWidthMm(format: PaperFormat): number {
+  return PAPER_SIZES[format].widthMm - PAGE_MARGIN_MM * 2;
+}
+
+export function isEntryOversized(entry: MiniFigEntry, format: PaperFormat): boolean {
+  return getEffectiveWidthMm(entry) > getUsablePageWidthMm(format);
+}
+
+function imageHeightMm(img: HTMLImageElement, widthMm: number): number {
+  return widthMm * (img.height / img.width);
 }
 
 function miniHeightMm(
   img: HTMLImageElement,
+  widthMm: number,
   showName: boolean,
   hasNumber: boolean
 ): number {
-  const imgH = imageHeightMm(img);
+  const imgH = imageHeightMm(img, widthMm);
   let labels = 0;
   if (showName || hasNumber) labels += LABEL_GAP_MM;
   if (showName) labels += LABEL_HEIGHT_MM;
@@ -178,11 +208,13 @@ function drawMiniFigToCanvas(
   img: HTMLImageElement,
   name: string,
   showName: boolean,
-  number: number | null
+  number: number | null,
+  widthMm: number
 ): HTMLCanvasElement {
+  const widthPx = Math.round(widthMm * SCALE);
   const hasNumber = number != null;
   const hasName = showName && !!name;
-  const imgPx = Math.round(WIDTH_PX * (img.height / img.width));
+  const imgPx = Math.round(widthPx * (img.height / img.width));
 
   let labels = 0;
   if (hasName || hasNumber) labels += GAP_PX;
@@ -190,7 +222,7 @@ function drawMiniFigToCanvas(
   if (hasNumber) labels += NUMBER_PX;
   const bandH = BUFFER_PX + labels;
 
-  const totalW = WIDTH_PX;
+  const totalW = widthPx;
   const totalH = bandH + imgPx * 2 + bandH;
   const fadeZone = Math.round(imgPx * 0.2);
 
@@ -291,30 +323,37 @@ interface MiniPdfData {
   showName: boolean;
   number: number | null;
   heightMm: number;
+  widthMm: number;
 }
 
 function drawMiniToPdf(pdf: jsPDF, mini: MiniPdfData, ox: number, oy: number) {
-  const { img, name, showName, number } = mini;
+  const { img, name, showName, number, widthMm } = mini;
 
   // Use the same canvas renderer as the preview to get consistent blur fades
-  const canvas = drawMiniFigToCanvas(img, name, showName, number);
+  const canvas = drawMiniFigToCanvas(img, name, showName, number, widthMm);
   const dataUrl = canvas.toDataURL("image/png");
-  pdf.addImage(dataUrl, "PNG", ox, oy, MINI_WIDTH_MM, mini.heightMm);
+  pdf.addImage(dataUrl, "PNG", ox, oy, widthMm, mini.heightMm);
 }
 
-export async function generatePdf(entries: MiniFigEntry[]): Promise<void> {
+export async function generatePdf(entries: MiniFigEntry[], format: PaperFormat = "a4", catalogueName = "paper-minis"): Promise<void> {
   await fontReady;
   const validEntries = entries.filter((e) => e.imageDataUrl);
   if (validEntries.length === 0) return;
+
+  const { widthMm: pageW, heightMm: pageH } = PAPER_SIZES[format];
+  const usableW = pageW - PAGE_MARGIN_MM * 2;
+  const usableH = pageH - PAGE_MARGIN_MM * 2;
 
   const allMinis: MiniPdfData[] = [];
 
   for (const entry of validEntries) {
     const img = await loadImage(entry.imageDataUrl!);
+    const widthMm = getEffectiveWidthMm(entry);
     for (let i = 0; i < entry.quantity; i++) {
       const number = entry.quantity > 1 ? i + 1 : null;
       const heightMm = miniHeightMm(
         img,
+        widthMm,
         entry.showName && !!entry.name,
         number != null
       );
@@ -324,6 +363,7 @@ export async function generatePdf(entries: MiniFigEntry[]): Promise<void> {
         showName: entry.showName,
         number,
         heightMm,
+        widthMm,
       });
     }
   }
@@ -331,7 +371,7 @@ export async function generatePdf(entries: MiniFigEntry[]): Promise<void> {
   // Sort by name/creature so identical types are grouped together
   allMinis.sort((a, b) => a.name.localeCompare(b.name));
 
-  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format });
   await ensureJsPdfFont(pdf);
 
   let pageX = PAGE_MARGIN_MM;
@@ -341,13 +381,13 @@ export async function generatePdf(entries: MiniFigEntry[]): Promise<void> {
   for (let i = 0; i < allMinis.length; i++) {
     const mini = allMinis[i];
 
-    if (pageX + MINI_WIDTH_MM > A4_WIDTH_MM - PAGE_MARGIN_MM) {
+    if (pageX + mini.widthMm > usableW + PAGE_MARGIN_MM) {
       pageX = PAGE_MARGIN_MM;
       pageY += rowMaxH + SPACING_MM;
       rowMaxH = 0;
     }
 
-    if (pageY + mini.heightMm > A4_HEIGHT_MM - PAGE_MARGIN_MM) {
+    if (pageY + mini.heightMm > usableH + PAGE_MARGIN_MM) {
       pdf.addPage();
       await ensureJsPdfFont(pdf);
       pageX = PAGE_MARGIN_MM;
@@ -358,10 +398,11 @@ export async function generatePdf(entries: MiniFigEntry[]): Promise<void> {
     drawMiniToPdf(pdf, mini, pageX, pageY);
 
     if (mini.heightMm > rowMaxH) rowMaxH = mini.heightMm;
-    pageX += MINI_WIDTH_MM + SPACING_MM;
+    pageX += mini.widthMm + SPACING_MM;
   }
 
-  pdf.save("paper-minis.pdf");
+  const safeName = catalogueName.replace(/[^a-z0-9_\-\s]/gi, "").trim() || "paper-minis";
+  pdf.save(`${safeName}.pdf`);
 }
 
 export async function renderPreview(
@@ -371,6 +412,7 @@ export async function renderPreview(
   await fontReady;
   if (!entry.imageDataUrl) return "";
   const img = await loadImage(entry.imageDataUrl);
-  const canvas = drawMiniFigToCanvas(img, entry.name, entry.showName, number);
+  const widthMm = getEffectiveWidthMm(entry);
+  const canvas = drawMiniFigToCanvas(img, entry.name, entry.showName, number, widthMm);
   return canvas.toDataURL("image/png");
 }
