@@ -1,13 +1,40 @@
-import type { Catalogue, MiniFigEntry } from "./types";
+import type { Catalogue, CreatureSize, MiniFigEntry, MiniSize, PaperFormat } from "./types";
 
 const CATALOGUES_KEY = "paper-mini-fig-catalogues";
 const ACTIVE_CATALOGUE_KEY = "paper-mini-fig-active-catalogue";
+const PAPER_FORMAT_KEY = "paper-mini-fig-paper-format";
+
+const VALID_MINI_SIZES: MiniSize[] = [24, 28, 32];
+const VALID_CREATURE_SIZES: CreatureSize[] = [
+  "tiny", "small", "medium", "large", "huge", "gargantuan",
+];
+
+function migrateEntry(e: unknown): MiniFigEntry {
+  const raw = e as Record<string, unknown>;
+  return {
+    id: (raw.id as string) || crypto.randomUUID(),
+    name: (raw.name as string) || "",
+    imageDataUrl: (raw.imageDataUrl as string | null) ?? null,
+    quantity: typeof raw.quantity === "number" ? raw.quantity : 1,
+    showName: typeof raw.showName === "boolean" ? raw.showName : true,
+    miniSize: VALID_MINI_SIZES.includes(raw.miniSize as MiniSize)
+      ? (raw.miniSize as MiniSize)
+      : 28,
+    creatureSize: VALID_CREATURE_SIZES.includes(raw.creatureSize as CreatureSize)
+      ? (raw.creatureSize as CreatureSize)
+      : "medium",
+  };
+}
 
 export function loadCatalogues(): Catalogue[] {
   try {
     const raw = localStorage.getItem(CATALOGUES_KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as Catalogue[];
+    const catalogues = JSON.parse(raw) as Catalogue[];
+    return catalogues.map((c) => ({
+      ...c,
+      entries: c.entries.map(migrateEntry),
+    }));
   } catch {
     return [];
   }
@@ -40,4 +67,18 @@ export function createCatalogue(
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
+}
+
+const VALID_PAPER_FORMATS: PaperFormat[] = ["a4", "a3"];
+
+export function getPaperFormat(): PaperFormat {
+  const raw = localStorage.getItem(PAPER_FORMAT_KEY);
+  if (raw && VALID_PAPER_FORMATS.includes(raw as PaperFormat)) {
+    return raw as PaperFormat;
+  }
+  return "a4";
+}
+
+export function setPaperFormat(format: PaperFormat): void {
+  localStorage.setItem(PAPER_FORMAT_KEY, format);
 }

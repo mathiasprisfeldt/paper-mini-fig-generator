@@ -1,17 +1,28 @@
 import { useState, useCallback, useEffect } from "react";
-import type { MiniFigEntry, Catalogue } from "./types";
+import type { MiniFigEntry, Catalogue, PaperFormat } from "./types";
 import { MiniFigForm } from "./components/MiniFigForm";
 import { MiniFigPreview } from "./components/MiniFigPreview";
 import { CataloguePanel } from "./components/CataloguePanel";
-import { generatePdf } from "./generatePdf";
+import { generatePdf, isEntryOversized } from "./generatePdf";
 import {
   loadCatalogues,
   saveCatalogues,
   getActiveCatalogueId,
   setActiveCatalogueId,
   createCatalogue,
+  getPaperFormat,
+  setPaperFormat as savePaperFormat,
 } from "./storage";
 import "./App.css";
+
+const MAX_OVERSIZED_NAMES = 3;
+
+function formatOversizedNames(items: MiniFigEntry[]): string {
+  const names = items.map((e) => e.name || "Unnamed");
+  const shown = names.slice(0, MAX_OVERSIZED_NAMES).join(", ");
+  const extra = names.length - MAX_OVERSIZED_NAMES;
+  return extra > 0 ? `${shown} and ${extra} more` : shown;
+}
 
 function createEntry(): MiniFigEntry {
   return {
@@ -20,6 +31,8 @@ function createEntry(): MiniFigEntry {
     imageDataUrl: null,
     quantity: 1,
     showName: true,
+    miniSize: 28,
+    creatureSize: "medium",
   };
 }
 
@@ -64,6 +77,12 @@ function App() {
   }, [resolvedActiveCatalogueId]);
 
   const [generating, setGenerating] = useState(false);
+  const [paperFormat, setPaperFormatState] = useState<PaperFormat>(getPaperFormat);
+
+  const handleSetPaperFormat = useCallback((format: PaperFormat) => {
+    setPaperFormatState(format);
+    savePaperFormat(format);
+  }, []);
 
   const activeCatalogue = catalogues.find(
     (c) => c.id === resolvedActiveCatalogueId
@@ -108,7 +127,7 @@ function App() {
     if (valid.length === 0) return;
     setGenerating(true);
     try {
-      await generatePdf(entries);
+      await generatePdf(entries, paperFormat, activeCatalogue?.name);
     } finally {
       setGenerating(false);
     }
@@ -156,6 +175,10 @@ function App() {
   const totalMinis = entries.reduce(
     (sum, e) => sum + (e.imageDataUrl ? e.quantity : 0),
     0
+  );
+
+  const oversizedEntries = entries.filter(
+    (e) => e.imageDataUrl && isEntryOversized(e, paperFormat)
   );
 
   return (
@@ -208,20 +231,46 @@ function App() {
               </section>
 
               <section className="export-section">
-                <div className="export-info">
-                  <span>
-                    {totalMinis} mini{totalMinis !== 1 ? "s" : ""} total
-                  </span>
-                  <span className="dot">·</span>
-                  <span>28mm · Square base · A4 PDF</span>
+                {oversizedEntries.length > 0 && (
+                  <div className="oversized-notice">
+                    <span className="oversized-notice-icon">⚠️</span>
+                    <span>
+                      {formatOversizedNames(oversizedEntries)}{" "}
+                      {oversizedEntries.length === 1 ? "exceeds" : "exceed"} the{" "}
+                      {paperFormat.toUpperCase()} page width.
+                      {paperFormat === "a4" && " Try switching to A3."}
+                    </span>
+                  </div>
+                )}
+                <div className="export-controls">
+                  <div className="export-info">
+                    <span>
+                      {totalMinis} mini{totalMinis !== 1 ? "s" : ""} total
+                    </span>
+                    <span className="dot">·</span>
+                    <span>Square base</span>
+                    <span className="dot">·</span>
+                    <div className="format-picker">
+                      {(["a4", "a3"] as PaperFormat[]).map((f) => (
+                        <button
+                          key={f}
+                          className={`format-btn${paperFormat === f ? " active" : ""}`}
+                          onClick={() => handleSetPaperFormat(f)}
+                        >
+                          {f.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                    <span>PDF</span>
+                  </div>
+                  <button
+                    className="btn btn-primary btn-large"
+                    onClick={handleGenerate}
+                    disabled={generating || totalMinis === 0}
+                  >
+                    {generating ? "Generating..." : "Generate PDF"}
+                  </button>
                 </div>
-                <button
-                  className="btn btn-primary btn-large"
-                  onClick={handleGenerate}
-                  disabled={generating || totalMinis === 0}
-                >
-                  {generating ? "Generating..." : "Generate PDF"}
-                </button>
               </section>
             </>
           )}
