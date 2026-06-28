@@ -167,6 +167,58 @@ function renderBlurredStrip(
   return canvas;
 }
 
+/**
+ * Renders a blurred band with a smooth fade into the adjacent image.
+ * The blurred strip is rotated 180° (mirrored) so it reads as a reflection
+ * of the figure. The returned canvas is `contentH + fadeZone` px tall.
+ *
+ * `side` = "top": the solid band occupies the top `contentH` px and the
+ *   bottom `fadeZone` px fade to transparent (blending into the image below).
+ * `side` = "bottom": the solid band occupies the bottom `contentH` px and the
+ *   top `fadeZone` px fade to transparent (blending into the image above).
+ */
+function renderFadedBlurBand(
+  img: HTMLImageElement,
+  w: number,
+  contentH: number,
+  fadeZone: number,
+  side: "top" | "bottom"
+): HTMLCanvasElement {
+  const extH = contentH + fadeZone;
+  const blur = renderBlurredStrip(img, w, extH, "bottom");
+
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = extH;
+  const ctx = canvas.getContext("2d")!;
+
+  // Rotate the blurred strip 180° (mirror) so it mirrors the figure.
+  ctx.save();
+  ctx.translate(w, extH);
+  ctx.scale(-1, -1);
+  ctx.drawImage(blur, 0, 0);
+  ctx.restore();
+
+  // Fade out the edge adjacent to the image for a smooth transition.
+  ctx.globalCompositeOperation = "destination-out";
+  if (side === "top") {
+    const g = ctx.createLinearGradient(0, contentH, 0, extH);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(1, "rgba(0,0,0,1)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, contentH, w, fadeZone);
+  } else {
+    const g = ctx.createLinearGradient(0, 0, 0, fadeZone);
+    g.addColorStop(0, "rgba(0,0,0,1)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, fadeZone);
+  }
+  ctx.globalCompositeOperation = "source-over";
+
+  return canvas;
+}
+
 function fitCanvasFontSize(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -245,42 +297,13 @@ function drawMiniFigToCanvas(
 
   ctx.drawImage(img, 0, imgTopY + imgPx, totalW, imgPx);
 
-  // === One single blur for top band + fade ===
-  const topExtH = bandH + fadeZone;
-  const topBlur = renderBlurredStrip(img, totalW, topExtH, "bottom");
+  // === Blurred top band with smooth fade into the image below ===
+  const topBand = renderFadedBlurBand(img, totalW, bandH, fadeZone, "top");
+  ctx.drawImage(topBand, 0, 0);
 
-  const topMask = document.createElement("canvas");
-  topMask.width = totalW;
-  topMask.height = topExtH;
-  const tmCtx = topMask.getContext("2d")!;
-  tmCtx.translate(0, topExtH);
-  tmCtx.scale(1, -1);
-  tmCtx.drawImage(topBlur, 0, 0);
-  tmCtx.setTransform(1, 0, 0, 1, 0, 0);
-  const tg = tmCtx.createLinearGradient(0, bandH, 0, topExtH);
-  tg.addColorStop(0, "rgba(0,0,0,0)");
-  tg.addColorStop(1, "rgba(0,0,0,1)");
-  tmCtx.globalCompositeOperation = "destination-out";
-  tmCtx.fillStyle = tg;
-  tmCtx.fillRect(0, bandH, totalW, fadeZone);
-  ctx.drawImage(topMask, 0, 0);
-
-  // === One single blur for bottom band + fade ===
-  const botExtH = fadeZone + bandH;
-  const botBlur = renderBlurredStrip(img, totalW, botExtH, "bottom");
-
-  const botMask = document.createElement("canvas");
-  botMask.width = totalW;
-  botMask.height = botExtH;
-  const bmCtx = botMask.getContext("2d")!;
-  bmCtx.drawImage(botBlur, 0, 0);
-  const bg = bmCtx.createLinearGradient(0, 0, 0, fadeZone);
-  bg.addColorStop(0, "rgba(0,0,0,1)");
-  bg.addColorStop(1, "rgba(0,0,0,0)");
-  bmCtx.globalCompositeOperation = "destination-out";
-  bmCtx.fillStyle = bg;
-  bmCtx.fillRect(0, 0, totalW, fadeZone);
-  ctx.drawImage(botMask, 0, imgTopY + imgPx * 2 - fadeZone);
+  // === Blurred bottom band with smooth fade into the image above ===
+  const botBand = renderFadedBlurBand(img, totalW, bandH, fadeZone, "bottom");
+  ctx.drawImage(botBand, 0, imgTopY + imgPx * 2 - fadeZone);
 
   // === Text on top band (rotated 180° so it reads correctly when folded) ===
   let ty = BUFFER_PX;
@@ -331,28 +354,26 @@ function renderFlippedImageToDataUrl(img: HTMLImageElement): string {
 function renderPdfBand(
   img: HTMLImageElement,
   widthMm: number,
-  bandH: number,
-  flipped: boolean,
+  contentH: number,
+  fadeZone: number,
+  side: "top" | "bottom",
   labels: { text: string; hPx: number; fontSize: number }[]
 ): string {
   const w = Math.round(widthMm * SCALE);
-  const blur = renderBlurredStrip(img, w, bandH, "bottom");
+  const band = renderFadedBlurBand(img, w, contentH, fadeZone, side);
+  const extH = contentH + fadeZone;
 
   const canvas = document.createElement("canvas");
   canvas.width = w;
-  canvas.height = bandH;
+  canvas.height = extH;
   const ctx = canvas.getContext("2d")!;
-
-  if (flipped) {
-    ctx.translate(0, bandH);
-    ctx.scale(1, -1);
-  }
-  ctx.drawImage(blur, 0, 0);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(band, 0, 0);
 
   // Top band: spacer → labels → gap. Bottom band: gap → labels → spacer.
+  // The bottom band's content sits below the fade zone overlapping the image.
+  const flipped = side === "top";
   const hasLabels = labels.length > 0;
-  let y = flipped ? BUFFER_PX : (hasLabels ? GAP_PX : 0);
+  let y = flipped ? BUFFER_PX : fadeZone + (hasLabels ? GAP_PX : 0);
   for (const label of labels) {
     if (flipped) {
       ctx.save();
@@ -406,24 +427,31 @@ function drawMiniToPdf(pdf: jsPDF, mini: MiniPdfData, ox: number, oy: number) {
   const bandH = BUFFER_PX + labelsPx;
   const bandMm = STAND_BUFFER_MM + (hasAnyLabel ? LABEL_GAP_MM : 0) + (hasName ? LABEL_HEIGHT_MM : 0) + (hasNumber ? NUMBER_HEIGHT_MM : 0);
 
-  let y = oy;
+  // Fade zone overlaps the band into the adjacent image for a smooth blur transition.
+  const imgPx = Math.round(widthPx * (img.height / img.width));
+  const fadeZone = Math.round(imgPx * 0.2);
+  const fadeMm = fadeZone / SCALE;
 
-  // Top band (one single blurred piece, flipped)
-  const topUrl = renderPdfBand(img, widthMm, bandH, true, topLabels);
-  pdf.addImage(topUrl, "PNG", ox, y, widthMm, bandMm);
-  y += bandMm;
+  const mirrorY = oy + bandMm;
+  const frontY = mirrorY + imgHMm;
+  const botBandY = frontY + imgHMm;
 
-  // Mirrored image
-  pdf.addImage(backDataUrl, "PNG", ox, y, widthMm, imgHMm);
-  y += imgHMm;
+  // Draw images first, then overlay the blurred bands so their faded edges
+  // blend smoothly into the images.
+
+  // Mirrored image (back side)
+  pdf.addImage(backDataUrl, "PNG", ox, mirrorY, widthMm, imgHMm);
 
   // Front image
-  pdf.addImage(img, "PNG", ox, y, widthMm, imgHMm);
-  y += imgHMm;
+  pdf.addImage(img, "PNG", ox, frontY, widthMm, imgHMm);
 
-  // Bottom band (one single blurred piece)
-  const botUrl = renderPdfBand(img, widthMm, bandH, false, botLabels);
-  pdf.addImage(botUrl, "PNG", ox, y, widthMm, bandMm);
+  // Top band (blurred, mirrored), fading down into the mirrored image
+  const topUrl = renderPdfBand(img, widthMm, bandH, fadeZone, "top", topLabels);
+  pdf.addImage(topUrl, "PNG", ox, oy, widthMm, bandMm + fadeMm);
+
+  // Bottom band (blurred, mirrored), fading up into the front image
+  const botUrl = renderPdfBand(img, widthMm, bandH, fadeZone, "bottom", botLabels);
+  pdf.addImage(botUrl, "PNG", ox, botBandY - fadeMm, widthMm, bandMm + fadeMm);
 }
 
 export async function generatePdf(entries: MiniFigEntry[], format: PaperFormat = "a4", catalogueName = "paper-minis"): Promise<void> {
