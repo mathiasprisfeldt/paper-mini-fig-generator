@@ -11,15 +11,19 @@ const VALID_CREATURE_SIZES: CreatureSize[] = [
 
 function migrateEntry(e: unknown): MiniFigEntry {
   const raw = e as Record<string, unknown>;
-  const miniSize: MiniSize = VALID_MINI_SIZES.includes(raw.miniSize as MiniSize)
-    ? (raw.miniSize as MiniSize)
-    : 28;
-  const creatureSize: CreatureSize = VALID_CREATURE_SIZES.includes(
-    raw.creatureSize as CreatureSize
-  )
-    ? (raw.creatureSize as CreatureSize)
-    : "medium";
-  return { ...(raw as unknown as MiniFigEntry), miniSize, creatureSize };
+  return {
+    id: (raw.id as string) || crypto.randomUUID(),
+    name: (raw.name as string) || "",
+    imageDataUrl: (raw.imageDataUrl as string | null) ?? null,
+    quantity: typeof raw.quantity === "number" ? raw.quantity : 1,
+    showName: typeof raw.showName === "boolean" ? raw.showName : true,
+    miniSize: VALID_MINI_SIZES.includes(raw.miniSize as MiniSize)
+      ? (raw.miniSize as MiniSize)
+      : 28,
+    creatureSize: VALID_CREATURE_SIZES.includes(raw.creatureSize as CreatureSize)
+      ? (raw.creatureSize as CreatureSize)
+      : "medium",
+  };
 }
 
 export function loadCatalogues(): Catalogue[] {

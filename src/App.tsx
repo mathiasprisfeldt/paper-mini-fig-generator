@@ -77,11 +77,12 @@ function App() {
   }, [resolvedActiveCatalogueId]);
 
   const [generating, setGenerating] = useState(false);
-  const [paperFormat, setPaperFormat] = useState<PaperFormat>(getPaperFormat);
+  const [paperFormat, setPaperFormatState] = useState<PaperFormat>(getPaperFormat);
 
-  useEffect(() => {
-    savePaperFormat(paperFormat);
-  }, [paperFormat]);
+  const handleSetPaperFormat = useCallback((format: PaperFormat) => {
+    setPaperFormatState(format);
+    savePaperFormat(format);
+  }, []);
 
   const activeCatalogue = catalogues.find(
     (c) => c.id === resolvedActiveCatalogueId
@@ -254,7 +255,7 @@ function App() {
                         <button
                           key={f}
                           className={`format-btn${paperFormat === f ? " active" : ""}`}
-                          onClick={() => setPaperFormat(f)}
+                          onClick={() => handleSetPaperFormat(f)}
                         >
                           {f.toUpperCase()}
                         </button>
