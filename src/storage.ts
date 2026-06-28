@@ -1,7 +1,8 @@
-import type { Catalogue, CreatureSize, MiniFigEntry, MiniSize } from "./types";
+import type { Catalogue, CreatureSize, MiniFigEntry, MiniSize, PaperFormat } from "./types";
 
 const CATALOGUES_KEY = "paper-mini-fig-catalogues";
 const ACTIVE_CATALOGUE_KEY = "paper-mini-fig-active-catalogue";
+const PAPER_FORMAT_KEY = "paper-mini-fig-paper-format";
 
 const VALID_MINI_SIZES: MiniSize[] = [24, 28, 32];
 const VALID_CREATURE_SIZES: CreatureSize[] = [
@@ -62,4 +63,18 @@ export function createCatalogue(
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
+}
+
+const VALID_PAPER_FORMATS: PaperFormat[] = ["a4", "a3"];
+
+export function getPaperFormat(): PaperFormat {
+  const raw = localStorage.getItem(PAPER_FORMAT_KEY);
+  if (raw && VALID_PAPER_FORMATS.includes(raw as PaperFormat)) {
+    return raw as PaperFormat;
+  }
+  return "a4";
+}
+
+export function setPaperFormat(format: PaperFormat): void {
+  localStorage.setItem(PAPER_FORMAT_KEY, format);
 }

@@ -10,6 +10,8 @@ import {
   getActiveCatalogueId,
   setActiveCatalogueId,
   createCatalogue,
+  getPaperFormat,
+  setPaperFormat as savePaperFormat,
 } from "./storage";
 import "./App.css";
 
@@ -75,7 +77,11 @@ function App() {
   }, [resolvedActiveCatalogueId]);
 
   const [generating, setGenerating] = useState(false);
-  const [paperFormat, setPaperFormat] = useState<PaperFormat>("a4");
+  const [paperFormat, setPaperFormat] = useState<PaperFormat>(getPaperFormat);
+
+  useEffect(() => {
+    savePaperFormat(paperFormat);
+  }, [paperFormat]);
 
   const activeCatalogue = catalogues.find(
     (c) => c.id === resolvedActiveCatalogueId
