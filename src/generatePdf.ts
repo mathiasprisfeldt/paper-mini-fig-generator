@@ -273,7 +273,10 @@ function drawMiniFigToCanvas(
   botMask.width = totalW;
   botMask.height = botExtH;
   const bmCtx = botMask.getContext("2d")!;
+  bmCtx.translate(0, botExtH);
+  bmCtx.scale(1, -1);
   bmCtx.drawImage(botBlur, 0, 0);
+  bmCtx.setTransform(1, 0, 0, 1, 0, 0);
   const bg = bmCtx.createLinearGradient(0, 0, 0, fadeZone);
   bg.addColorStop(0, "rgba(0,0,0,1)");
   bg.addColorStop(1, "rgba(0,0,0,0)");
