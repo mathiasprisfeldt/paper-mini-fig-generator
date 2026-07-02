@@ -113,7 +113,9 @@ function renderBlurredStrip(
   img: HTMLImageElement,
   w: number,
   h: number,
-  edge: "top" | "bottom"
+  edge: "top" | "bottom",
+  blurPasses = BLUR_PASSES,
+  blurDownscale = BLUR_DOWNSCALE
 ): HTMLCanvasElement {
   // Draw the full image scaled to target width
   const imgScaledH = Math.round(w * (img.naturalHeight / img.naturalWidth));
@@ -132,8 +134,8 @@ function renderBlurredStrip(
   cctx.drawImage(full, 0, sy, w, h, 0, 0, w, h);
 
   // Blur by repeated downscale/upscale
-  const smallW = Math.max(2, Math.round(w / BLUR_DOWNSCALE));
-  const smallH = Math.max(2, Math.round(h / BLUR_DOWNSCALE));
+  const smallW = Math.max(2, Math.round(w / blurDownscale));
+  const smallH = Math.max(2, Math.round(h / blurDownscale));
   const small = document.createElement("canvas");
   small.width = smallW;
   small.height = smallH;
@@ -142,7 +144,7 @@ function renderBlurredStrip(
   sctx.imageSmoothingQuality = "low";
 
   let src: HTMLCanvasElement = crop;
-  for (let i = 0; i < BLUR_PASSES; i++) {
+  for (let i = 0; i < blurPasses; i++) {
     sctx.clearRect(0, 0, smallW, smallH);
     sctx.drawImage(src, 0, 0, smallW, smallH);
     const mid = document.createElement("canvas");
@@ -265,14 +267,15 @@ function drawMiniFigToCanvas(
   tmCtx.fillRect(0, bandH, totalW, fadeZone);
   ctx.drawImage(topMask, 0, 0);
 
-  // === One single blur for bottom band + fade ===
+  // === One single blur for bottom band + fade (pond-like reflection) ===
   const botExtH = fadeZone + bandH;
-  const botBlur = renderBlurredStrip(img, totalW, botExtH, "bottom");
+  const botBlur = renderBlurredStrip(img, totalW, botExtH, "bottom", 2, 4);
 
   const botMask = document.createElement("canvas");
   botMask.width = totalW;
   botMask.height = botExtH;
   const bmCtx = botMask.getContext("2d")!;
+  // Flip vertically so it mirrors the front image like a pond reflection
   bmCtx.translate(0, botExtH);
   bmCtx.scale(1, -1);
   bmCtx.drawImage(botBlur, 0, 0);
