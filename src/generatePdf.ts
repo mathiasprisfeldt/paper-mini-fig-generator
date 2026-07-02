@@ -47,8 +47,7 @@ const NUMBER_PX = NUMBER_HEIGHT_MM * SCALE;
 const BUFFER_PX = STAND_BUFFER_MM * SCALE;
 const GAP_PX = LABEL_GAP_MM * SCALE;
 
-const BLUR_PASSES = 3;
-const BLUR_DOWNSCALE = 8;
+const BLUR_RADIUS_FACTOR = 0.06; // blur radius as fraction of strip width
 const OVERLAY_ALPHA = 0.3;
 
 // Multipliers scale the base miniSize to the creature's tile footprint.
@@ -131,36 +130,17 @@ function renderBlurredStrip(
   const cctx = crop.getContext("2d")!;
   cctx.drawImage(full, 0, sy, w, h, 0, 0, w, h);
 
-  // Blur by repeated downscale/upscale
-  const smallW = Math.max(2, Math.round(w / BLUR_DOWNSCALE));
-  const smallH = Math.max(2, Math.round(h / BLUR_DOWNSCALE));
-  const small = document.createElement("canvas");
-  small.width = smallW;
-  small.height = smallH;
-  const sctx = small.getContext("2d")!;
-  sctx.imageSmoothingEnabled = true;
-  sctx.imageSmoothingQuality = "low";
-
-  let src: HTMLCanvasElement = crop;
-  for (let i = 0; i < BLUR_PASSES; i++) {
-    sctx.clearRect(0, 0, smallW, smallH);
-    sctx.drawImage(src, 0, 0, smallW, smallH);
-    const mid = document.createElement("canvas");
-    mid.width = w;
-    mid.height = h;
-    const mctx = mid.getContext("2d")!;
-    mctx.imageSmoothingEnabled = true;
-    mctx.imageSmoothingQuality = "high";
-    mctx.drawImage(small, 0, 0, w, h);
-    src = mid;
-  }
-
-  // Final output with dark overlay
+  // Apply Gaussian blur using canvas filter
+  const blurRadius = Math.max(2, Math.round(w * BLUR_RADIUS_FACTOR));
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d")!;
-  ctx.drawImage(src, 0, 0);
+  ctx.filter = `blur(${blurRadius}px)`;
+  ctx.drawImage(crop, 0, 0);
+  ctx.filter = "none";
+
+  // Dark overlay
   ctx.fillStyle = `rgba(0, 0, 0, ${OVERLAY_ALPHA})`;
   ctx.fillRect(0, 0, w, h);
 
@@ -169,7 +149,7 @@ function renderBlurredStrip(
 
 /**
  * Renders a blurred band with a smooth fade into the adjacent image.
- * The blurred strip is rotated 180° (mirrored) so it reads as a reflection
+ * The blurred strip is flipped vertically so it reads as a pond reflection
  * of the figure. The returned canvas is `contentH + fadeZone` px tall.
  *
  * `side` = "top": the solid band occupies the top `contentH` px and the
@@ -185,17 +165,20 @@ function renderFadedBlurBand(
   side: "top" | "bottom"
 ): HTMLCanvasElement {
   const extH = contentH + fadeZone;
-  const blur = renderBlurredStrip(img, w, extH, "bottom");
+  // Sample from the edge adjacent to this band for a pond-reflection look:
+  // top band reflects the top of the figure, bottom band reflects the bottom.
+  const edge = side === "top" ? "top" : "bottom";
+  const blur = renderBlurredStrip(img, w, extH, edge);
 
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = extH;
   const ctx = canvas.getContext("2d")!;
 
-  // Rotate the blurred strip 180° (mirror) so it mirrors the figure.
+  // Flip vertically (pond reflection) — only vertical mirror, not horizontal.
   ctx.save();
-  ctx.translate(w, extH);
-  ctx.scale(-1, -1);
+  ctx.translate(0, extH);
+  ctx.scale(1, -1);
   ctx.drawImage(blur, 0, 0);
   ctx.restore();
 
