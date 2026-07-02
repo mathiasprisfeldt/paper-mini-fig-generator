@@ -239,10 +239,39 @@ function drawMiniFigToCanvas(
   // === Draw images ===
   const imgTopY = bandH;
 
+  // Create a blurred version of the image for the pond reflection
+  const blurredMirror = document.createElement("canvas");
+  blurredMirror.width = totalW;
+  blurredMirror.height = imgPx;
+  const bmrCtx = blurredMirror.getContext("2d")!;
+  bmrCtx.drawImage(img, 0, 0, totalW, imgPx);
+  // Blur via downscale/upscale passes
+  const mirrorSmallW = Math.max(2, Math.round(totalW / 4));
+  const mirrorSmallH = Math.max(2, Math.round(imgPx / 4));
+  const mirrorSmall = document.createElement("canvas");
+  mirrorSmall.width = mirrorSmallW;
+  mirrorSmall.height = mirrorSmallH;
+  const msCtx = mirrorSmall.getContext("2d")!;
+  msCtx.imageSmoothingEnabled = true;
+  msCtx.imageSmoothingQuality = "low";
+  let mirrorSrc: HTMLCanvasElement = blurredMirror;
+  for (let i = 0; i < 3; i++) {
+    msCtx.clearRect(0, 0, mirrorSmallW, mirrorSmallH);
+    msCtx.drawImage(mirrorSrc, 0, 0, mirrorSmallW, mirrorSmallH);
+    const mid = document.createElement("canvas");
+    mid.width = totalW;
+    mid.height = imgPx;
+    const mctx = mid.getContext("2d")!;
+    mctx.imageSmoothingEnabled = true;
+    mctx.imageSmoothingQuality = "high";
+    mctx.drawImage(mirrorSmall, 0, 0, totalW, imgPx);
+    mirrorSrc = mid;
+  }
+
   ctx.save();
   ctx.translate(0, imgTopY + imgPx);
   ctx.scale(1, -1);
-  ctx.drawImage(img, 0, 0, totalW, imgPx);
+  ctx.drawImage(mirrorSrc, 0, 0, totalW, imgPx);
   ctx.restore();
 
   ctx.drawImage(img, 0, imgTopY + imgPx, totalW, imgPx);
