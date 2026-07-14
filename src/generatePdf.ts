@@ -31,25 +31,60 @@ const A4_HEIGHT_MM = 297;
 const PAGE_MARGIN_MM = 10;
 const SPACING_MM = 0;
 
-const PAPER_SIZES: Record<PaperFormat, { widthMm: number; heightMm: number }> = {
-  a4: { widthMm: A4_WIDTH_MM, heightMm: A4_HEIGHT_MM },
-  a3: { widthMm: 297, heightMm: 420 },
-};
+const PAPER_SIZES: Record<PaperFormat, { widthMm: number; heightMm: number }> =
+  {
+    a4: { widthMm: A4_WIDTH_MM, heightMm: A4_HEIGHT_MM },
+    a3: { widthMm: 297, heightMm: 420 },
+  };
 
-const LABEL_HEIGHT_MM = 6;
-const NUMBER_HEIGHT_MM = 10;
-const STAND_BUFFER_MM = 10;
-const LABEL_GAP_MM = 2;
+// --- Band content sizing (millimetres) ---
+const LABEL_HEIGHT_MM = 6; // height reserved for the name label text
+const NUMBER_HEIGHT_MM = 10; // height reserved for the quantity number text
+const STAND_BUFFER_MM = 10; // solid spacer at the outer end of each band (the "stand"/tab)
+const LABEL_GAP_MM = 2; // gap between the figure edge and the label block
 
-const SCALE = 12;
+const SCALE = 12; // canvas pixels per millimetre (mm → px conversion for rendering)
 const LABEL_PX = LABEL_HEIGHT_MM * SCALE;
 const NUMBER_PX = NUMBER_HEIGHT_MM * SCALE;
 const BUFFER_PX = STAND_BUFFER_MM * SCALE;
 const GAP_PX = LABEL_GAP_MM * SCALE;
 
-const BLUR_PASSES = 3;
-const BLUR_DOWNSCALE = 8;
-const OVERLAY_ALPHA = 0.3;
+// ---------------------------------------------------------------------------
+// LAYOUT GLOSSARY — shared vocabulary for one printed miniature
+// ---------------------------------------------------------------------------
+// A single miniature is rendered as a vertical, foldable strip. From top to
+// bottom it is composed of these regions (all the code below uses these names):
+//
+//   1. TOP BAND        — decorative reflection area above the back figure.
+//                        It shows a blurred, darkened copy of the figure's
+//                        lower edge ("strip") and also holds the fold-side
+//                        label/number text (rotated 180°).
+//   2. BACK FIGURE     — the figure image drawn upside-down (vertically
+//                        mirrored). This is the half you see through the paper
+//                        after folding; it sits above the fold line.
+//   3. FRONT FIGURE    — the figure image drawn right-side-up. This is the
+//                        main, sharp image the viewer looks at.
+//   4. BOTTOM BAND     — decorative reflection area below the front figure.
+//                        Mirror of the TOP BAND: blurred strip + labels.
+//
+// STRIP — a thin slice sampled from the *bottom edge* of the source artwork
+//         (see renderEdgeStrip). Both bands are built from this same strip so
+//         the reflection reads as if the figure is standing on/in a surface.
+//
+// FADE ZONE — the overlapping pixels where a band blends into the adjacent
+//             figure so there is no hard seam between band and figure.
+// ---------------------------------------------------------------------------
+
+// --- Reflection band tuning (TOP BAND + BOTTOM BAND) ---
+// Blur strength of the reflected STRIP, as a fraction of the strip width.
+// This is the value to change to make the reflected images more/less blurry.
+const BLUR_RADIUS_FACTOR = 0.025;
+// Opacity of the black overlay painted over each band (0 = none, 1 = solid).
+// Higher = darker reflections and more contrast for the band's white text.
+const OVERLAY_ALPHA = 0.5;
+// Height of the FADE ZONE (band↔figure blend), as a fraction of figure height.
+// Higher = longer, softer transition; lower = shorter, more abrupt seam.
+const FADE_ZONE_FACTOR = 0.18;
 
 // Multipliers scale the base miniSize to the creature's tile footprint.
 // D&D 5e: 1 tile = 5 ft. For a Medium creature at miniSize mm scale,
@@ -73,7 +108,10 @@ export function getUsablePageWidthMm(format: PaperFormat): number {
   return PAPER_SIZES[format].widthMm - PAGE_MARGIN_MM * 2;
 }
 
-export function isEntryOversized(entry: MiniFigEntry, format: PaperFormat): boolean {
+export function isEntryOversized(
+  entry: MiniFigEntry,
+  format: PaperFormat,
+): boolean {
   return getEffectiveWidthMm(entry) > getUsablePageWidthMm(format);
 }
 
@@ -81,11 +119,22 @@ function imageHeightMm(img: HTMLImageElement, widthMm: number): number {
   return widthMm * (img.height / img.width);
 }
 
+/**
+ * Height of the FADE ZONE in pixels (band↔figure blend), derived from the
+ * figure height via FADE_ZONE_FACTOR, with a small minimum.
+ */
+function getFadeZonePx(widthPx: number, img: HTMLImageElement): number {
+  return Math.max(
+    12,
+    Math.round(widthPx * (img.height / img.width) * FADE_ZONE_FACTOR),
+  );
+}
+
 function miniHeightMm(
   img: HTMLImageElement,
   widthMm: number,
   showName: boolean,
-  hasNumber: boolean
+  hasNumber: boolean,
 ): number {
   const imgH = imageHeightMm(img, widthMm);
   let labels = 0;
@@ -105,15 +154,15 @@ function loadImage(dataUrl: string): Promise<HTMLImageElement> {
 }
 
 /**
- * Renders a blurred + darkened strip sampled from an edge of the image.
- * `edge` = "top" samples from the top of the source, "bottom" from the bottom.
- * The strip is w x h pixels.
+ * Builds the STRIP: samples a thin slice from the top or bottom edge of the
+ * source artwork after scaling it to the target width. Both reflection bands
+ * are built from this strip. `edge` selects which edge is sampled.
  */
-function renderBlurredStrip(
+function renderEdgeStrip(
   img: HTMLImageElement,
   w: number,
   h: number,
-  edge: "top" | "bottom"
+  edge: "top" | "bottom",
 ): HTMLCanvasElement {
   // Draw the full image scaled to target width
   const imgScaledH = Math.round(w * (img.naturalHeight / img.naturalWidth));
@@ -131,38 +180,121 @@ function renderBlurredStrip(
   const cctx = crop.getContext("2d")!;
   cctx.drawImage(full, 0, sy, w, h, 0, 0, w, h);
 
-  // Blur by repeated downscale/upscale
-  const smallW = Math.max(2, Math.round(w / BLUR_DOWNSCALE));
-  const smallH = Math.max(2, Math.round(h / BLUR_DOWNSCALE));
-  const small = document.createElement("canvas");
-  small.width = smallW;
-  small.height = smallH;
-  const sctx = small.getContext("2d")!;
-  sctx.imageSmoothingEnabled = true;
-  sctx.imageSmoothingQuality = "low";
+  return crop;
+}
 
-  let src: HTMLCanvasElement = crop;
-  for (let i = 0; i < BLUR_PASSES; i++) {
-    sctx.clearRect(0, 0, smallW, smallH);
-    sctx.drawImage(src, 0, 0, smallW, smallH);
-    const mid = document.createElement("canvas");
-    mid.width = w;
-    mid.height = h;
-    const mctx = mid.getContext("2d")!;
-    mctx.imageSmoothingEnabled = true;
-    mctx.imageSmoothingQuality = "high";
-    mctx.drawImage(small, 0, 0, w, h);
-    src = mid;
-  }
+/**
+ * Returns a blurred copy of the STRIP. Blur amount is BLUR_RADIUS_FACTOR of the
+ * strip width. This is what makes the reflection bands look soft.
+ *
+ * The strip is rendered onto a canvas padded by the blur radius and overscanned
+ * (content stretched to fill the padding) before blurring, then cropped back to
+ * the original size. This keeps the blur from sampling transparent pixels at the
+ * edges, which would otherwise leave a visible faded rim around each band.
+ */
+function renderBlurredStrip(source: HTMLCanvasElement): HTMLCanvasElement {
+  const { width: w, height: h } = source;
+  const blurRadius = Math.max(2, Math.round(w * BLUR_RADIUS_FACTOR));
+  // Pad generously (2x radius) so no transparent pixels fall within blur reach.
+  const pad = blurRadius * 2;
 
-  // Final output with dark overlay
+  const padded = document.createElement("canvas");
+  padded.width = w + pad * 2;
+  padded.height = h + pad * 2;
+  const pctx = padded.getContext("2d")!;
+  pctx.filter = `blur(${blurRadius}px)`;
+  // Overscan: stretch the strip to fill the padded area so content reaches the
+  // edges instead of leaving transparent margins for the blur to bleed into.
+  pctx.drawImage(source, 0, 0, w, h, 0, 0, w + pad * 2, h + pad * 2);
+  pctx.filter = "none";
+
+  // Crop back to the original strip size from the centre of the padded canvas.
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d")!;
-  ctx.drawImage(src, 0, 0);
+  ctx.drawImage(padded, pad, pad, w, h, 0, 0, w, h);
+
+  return canvas;
+}
+
+/**
+ * Draws a strip into a context, optionally vertically mirrored (`flipY`).
+ * Used to orient the reflected strip for the TOP BAND vs the BOTTOM BAND.
+ */
+function drawTransformedStrip(
+  ctx: CanvasRenderingContext2D,
+  strip: CanvasImageSource,
+  height: number,
+  transform: "none" | "flipY",
+) {
+  ctx.save();
+  if (transform === "flipY") {
+    ctx.translate(0, height);
+    ctx.scale(1, -1);
+  }
+  ctx.drawImage(strip, 0, 0);
+  ctx.restore();
+}
+
+/**
+ * Renders one reflection band (TOP BAND or BOTTOM BAND).
+ *
+ * The band = blurred STRIP + dark OVERLAY + a FADE ZONE that dissolves the
+ * edge adjacent to the figure so band and figure blend seamlessly.
+ * The returned canvas is `contentH + fadeZone` px tall.
+ *
+ * `side` = "top": solid content occupies the top `contentH` px; the bottom
+ *   `fadeZone` px fade out (blending down into the BACK FIGURE below).
+ * `side` = "bottom": solid content occupies the bottom `contentH` px; the top
+ *   `fadeZone` px fade out (blending up into the FRONT FIGURE above).
+ */
+function renderFadedBlurBand(
+  img: HTMLImageElement,
+  w: number,
+  contentH: number,
+  fadeZone: number,
+  side: "top" | "bottom",
+): HTMLCanvasElement {
+  const extH = contentH + fadeZone;
+  // Both bands reflect away from the lower edge of the figure artwork.
+  // For the top band, that lower-edge sample sits above the already mirrored
+  // figure, so it should not be vertically flipped again.
+  const edge = "bottom";
+  const strip = renderEdgeStrip(img, w, extH, edge);
+  // Blur the reflection strip itself so both bands read as soft reflections.
+  const blur = renderBlurredStrip(strip);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = extH;
+  const ctx = canvas.getContext("2d")!;
+
+  drawTransformedStrip(ctx, blur, extH, side === "top" ? "none" : "flipY");
+
   ctx.fillStyle = `rgba(0, 0, 0, ${OVERLAY_ALPHA})`;
-  ctx.fillRect(0, 0, w, h);
+  ctx.fillRect(0, 0, w, extH);
+
+  // Fade out the edge adjacent to the image for a smooth transition.
+  ctx.globalCompositeOperation = "destination-out";
+  if (side === "top") {
+    const g = ctx.createLinearGradient(0, contentH, 0, extH);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(0.45, "rgba(0,0,0,0.18)");
+    g.addColorStop(0.78, "rgba(0,0,0,0.62)");
+    g.addColorStop(1, "rgba(0,0,0,1)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, contentH, w, fadeZone);
+  } else {
+    const g = ctx.createLinearGradient(0, 0, 0, fadeZone);
+    g.addColorStop(0, "rgba(0,0,0,1)");
+    g.addColorStop(0.22, "rgba(0,0,0,0.62)");
+    g.addColorStop(0.55, "rgba(0,0,0,0.18)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, fadeZone);
+  }
+  ctx.globalCompositeOperation = "source-over";
 
   return canvas;
 }
@@ -171,7 +303,7 @@ function fitCanvasFontSize(
   ctx: CanvasRenderingContext2D,
   text: string,
   maxWidth: number,
-  startSize: number
+  startSize: number,
 ): number {
   let fs = startSize;
   ctx.font = `bold ${fs}px ${FONT_FAMILY}`;
@@ -189,7 +321,7 @@ function drawTextOnCtx(
   y: number,
   w: number,
   h: number,
-  fontSize: number
+  fontSize: number,
 ) {
   ctx.fillStyle = "#ffffff";
   ctx.font = `bold ${fontSize}px ${FONT_FAMILY}`;
@@ -209,7 +341,7 @@ function drawMiniFigToCanvas(
   name: string,
   showName: boolean,
   number: number | null,
-  widthMm: number
+  widthMm: number,
 ): HTMLCanvasElement {
   const widthPx = Math.round(widthMm * SCALE);
   const hasNumber = number != null;
@@ -223,8 +355,8 @@ function drawMiniFigToCanvas(
   const bandH = BUFFER_PX + labels;
 
   const totalW = widthPx;
+  const fadeZone = getFadeZonePx(widthPx, img);
   const totalH = bandH + imgPx * 2 + bandH;
-  const fadeZone = Math.round(imgPx * 0.2);
 
   const canvas = document.createElement("canvas");
   canvas.width = totalW;
@@ -234,55 +366,28 @@ function drawMiniFigToCanvas(
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, totalW, totalH);
 
-  // === Draw images ===
+  // === Draw figures ===
   const imgTopY = bandH;
 
+  // BACK FIGURE — drawn upside-down (vertically mirrored), above the fold.
   ctx.save();
   ctx.translate(0, imgTopY + imgPx);
   ctx.scale(1, -1);
   ctx.drawImage(img, 0, 0, totalW, imgPx);
   ctx.restore();
 
+  // FRONT FIGURE — drawn right-side-up, below the fold.
   ctx.drawImage(img, 0, imgTopY + imgPx, totalW, imgPx);
 
-  // === One single blur for top band + fade ===
-  const topExtH = bandH + fadeZone;
-  const topBlur = renderBlurredStrip(img, totalW, topExtH, "bottom");
+  // === TOP BAND (blurred reflection), fading down into the BACK FIGURE ===
+  const topBand = renderFadedBlurBand(img, totalW, bandH, fadeZone, "top");
+  ctx.drawImage(topBand, 0, 0);
 
-  const topMask = document.createElement("canvas");
-  topMask.width = totalW;
-  topMask.height = topExtH;
-  const tmCtx = topMask.getContext("2d")!;
-  tmCtx.translate(0, topExtH);
-  tmCtx.scale(1, -1);
-  tmCtx.drawImage(topBlur, 0, 0);
-  tmCtx.setTransform(1, 0, 0, 1, 0, 0);
-  const tg = tmCtx.createLinearGradient(0, bandH, 0, topExtH);
-  tg.addColorStop(0, "rgba(0,0,0,0)");
-  tg.addColorStop(1, "rgba(0,0,0,1)");
-  tmCtx.globalCompositeOperation = "destination-out";
-  tmCtx.fillStyle = tg;
-  tmCtx.fillRect(0, bandH, totalW, fadeZone);
-  ctx.drawImage(topMask, 0, 0);
+  // === BOTTOM BAND (blurred reflection), fading up into the FRONT FIGURE ===
+  const botBand = renderFadedBlurBand(img, totalW, bandH, fadeZone, "bottom");
+  ctx.drawImage(botBand, 0, imgTopY + imgPx * 2 - fadeZone);
 
-  // === One single blur for bottom band + fade ===
-  const botExtH = fadeZone + bandH;
-  const botBlur = renderBlurredStrip(img, totalW, botExtH, "bottom");
-
-  const botMask = document.createElement("canvas");
-  botMask.width = totalW;
-  botMask.height = botExtH;
-  const bmCtx = botMask.getContext("2d")!;
-  bmCtx.drawImage(botBlur, 0, 0);
-  const bg = bmCtx.createLinearGradient(0, 0, 0, fadeZone);
-  bg.addColorStop(0, "rgba(0,0,0,1)");
-  bg.addColorStop(1, "rgba(0,0,0,0)");
-  bmCtx.globalCompositeOperation = "destination-out";
-  bmCtx.fillStyle = bg;
-  bmCtx.fillRect(0, 0, totalW, fadeZone);
-  ctx.drawImage(botMask, 0, imgTopY + imgPx * 2 - fadeZone);
-
-  // === Text on top band (rotated 180° so it reads correctly when folded) ===
+  // === Text on TOP BAND (rotated 180° so it reads correctly when folded) ===
   let ty = BUFFER_PX;
   if (hasNumber) {
     ctx.save();
@@ -301,8 +406,8 @@ function drawMiniFigToCanvas(
     ctx.restore();
   }
 
-  // === Text on bottom band ===
-  let by = imgTopY + imgPx * 2 + ((hasName || hasNumber) ? GAP_PX : 0);
+  // === Text on BOTTOM BAND ===
+  let by = imgTopY + imgPx * 2 + (hasName || hasNumber ? GAP_PX : 0);
   if (hasName) {
     const fs = fitCanvasFontSize(ctx, name, totalW * 0.9, LABEL_PX * 0.7);
     drawTextOnCtx(ctx, name, 0, by, totalW, LABEL_PX, fs);
@@ -317,42 +422,44 @@ function drawMiniFigToCanvas(
 
 // --- PDF rendering ---
 
-function renderFlippedImageToDataUrl(img: HTMLImageElement): string {
+function renderFlippedImageToDataUrl(
+  img: HTMLImageElement,
+  widthPx: number,
+): string {
+  const heightPx = Math.round(widthPx * (img.naturalHeight / img.naturalWidth));
   const canvas = document.createElement("canvas");
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
+  canvas.width = widthPx;
+  canvas.height = heightPx;
   const ctx = canvas.getContext("2d")!;
-  ctx.translate(0, img.naturalHeight);
+  ctx.translate(0, heightPx);
   ctx.scale(1, -1);
-  ctx.drawImage(img, 0, 0);
+  ctx.drawImage(img, 0, 0, widthPx, heightPx);
   return canvas.toDataURL("image/png");
 }
 
 function renderPdfBand(
   img: HTMLImageElement,
   widthMm: number,
-  bandH: number,
-  flipped: boolean,
-  labels: { text: string; hPx: number; fontSize: number }[]
+  contentH: number,
+  fadeZone: number,
+  side: "top" | "bottom",
+  labels: { text: string; hPx: number; fontSize: number }[],
 ): string {
   const w = Math.round(widthMm * SCALE);
-  const blur = renderBlurredStrip(img, w, bandH, "bottom");
+  const band = renderFadedBlurBand(img, w, contentH, fadeZone, side);
+  const extH = contentH + fadeZone;
 
   const canvas = document.createElement("canvas");
   canvas.width = w;
-  canvas.height = bandH;
+  canvas.height = extH;
   const ctx = canvas.getContext("2d")!;
-
-  if (flipped) {
-    ctx.translate(0, bandH);
-    ctx.scale(1, -1);
-  }
-  ctx.drawImage(blur, 0, 0);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(band, 0, 0);
 
   // Top band: spacer → labels → gap. Bottom band: gap → labels → spacer.
+  // The bottom band's content sits below the fade zone overlapping the image.
+  const flipped = side === "top";
   const hasLabels = labels.length > 0;
-  let y = flipped ? BUFFER_PX : (hasLabels ? GAP_PX : 0);
+  let y = flipped ? BUFFER_PX : fadeZone + (hasLabels ? GAP_PX : 0);
   for (const label of labels) {
     if (flipped) {
       ctx.save();
@@ -385,18 +492,38 @@ function drawMiniToPdf(pdf: jsPDF, mini: MiniPdfData, ox: number, oy: number) {
   const hasName = showName && !!name;
   const imgHMm = imageHeightMm(img, widthMm);
 
-  const backDataUrl = renderFlippedImageToDataUrl(img);
+  const backDataUrl = renderFlippedImageToDataUrl(img, widthPx);
   const tmpCtx = document.createElement("canvas").getContext("2d")!;
 
   // Build label list for top (number first, then name — outermost to innermost)
   const topLabels: { text: string; hPx: number; fontSize: number }[] = [];
-  if (hasNumber) topLabels.push({ text: `${number}`, hPx: NUMBER_PX, fontSize: NUMBER_PX * 0.85 });
-  if (hasName) topLabels.push({ text: name, hPx: LABEL_PX, fontSize: fitCanvasFontSize(tmpCtx, name, widthPx * 0.9, LABEL_PX * 0.7) });
+  if (hasNumber)
+    topLabels.push({
+      text: `${number}`,
+      hPx: NUMBER_PX,
+      fontSize: NUMBER_PX * 0.85,
+    });
+  if (hasName)
+    topLabels.push({
+      text: name,
+      hPx: LABEL_PX,
+      fontSize: fitCanvasFontSize(tmpCtx, name, widthPx * 0.9, LABEL_PX * 0.7),
+    });
 
   // Build label list for bottom (name first, then number — innermost to outermost)
   const botLabels: { text: string; hPx: number; fontSize: number }[] = [];
-  if (hasName) botLabels.push({ text: name, hPx: LABEL_PX, fontSize: fitCanvasFontSize(tmpCtx, name, widthPx * 0.9, LABEL_PX * 0.7) });
-  if (hasNumber) botLabels.push({ text: `${number}`, hPx: NUMBER_PX, fontSize: NUMBER_PX * 0.85 });
+  if (hasName)
+    botLabels.push({
+      text: name,
+      hPx: LABEL_PX,
+      fontSize: fitCanvasFontSize(tmpCtx, name, widthPx * 0.9, LABEL_PX * 0.7),
+    });
+  if (hasNumber)
+    botLabels.push({
+      text: `${number}`,
+      hPx: NUMBER_PX,
+      fontSize: NUMBER_PX * 0.85,
+    });
 
   let labelsPx = 0;
   const hasAnyLabel = hasName || hasNumber;
@@ -404,29 +531,50 @@ function drawMiniToPdf(pdf: jsPDF, mini: MiniPdfData, ox: number, oy: number) {
   if (hasName) labelsPx += LABEL_PX;
   if (hasNumber) labelsPx += NUMBER_PX;
   const bandH = BUFFER_PX + labelsPx;
-  const bandMm = STAND_BUFFER_MM + (hasAnyLabel ? LABEL_GAP_MM : 0) + (hasName ? LABEL_HEIGHT_MM : 0) + (hasNumber ? NUMBER_HEIGHT_MM : 0);
+  const bandMm =
+    STAND_BUFFER_MM +
+    (hasAnyLabel ? LABEL_GAP_MM : 0) +
+    (hasName ? LABEL_HEIGHT_MM : 0) +
+    (hasNumber ? NUMBER_HEIGHT_MM : 0);
 
-  let y = oy;
+  // Fade zone overlaps the band into the adjacent image for a smooth blur transition.
+  const fadeZone = getFadeZonePx(widthPx, img);
+  const fadeMm = fadeZone / SCALE;
 
-  // Top band (one single blurred piece, flipped)
-  const topUrl = renderPdfBand(img, widthMm, bandH, true, topLabels);
-  pdf.addImage(topUrl, "PNG", ox, y, widthMm, bandMm);
-  y += bandMm;
+  const mirrorY = oy + bandMm;
+  const frontY = mirrorY + imgHMm;
+  const botBandY = frontY + imgHMm;
 
-  // Mirrored image
-  pdf.addImage(backDataUrl, "PNG", ox, y, widthMm, imgHMm);
-  y += imgHMm;
+  // Draw images first, then overlay the blurred bands so their faded edges
+  // blend smoothly into the images.
+
+  // Mirrored image (back side)
+  pdf.addImage(backDataUrl, "PNG", ox, mirrorY, widthMm, imgHMm);
 
   // Front image
-  pdf.addImage(img, "PNG", ox, y, widthMm, imgHMm);
-  y += imgHMm;
+  pdf.addImage(img, "PNG", ox, frontY, widthMm, imgHMm);
 
-  // Bottom band (one single blurred piece)
-  const botUrl = renderPdfBand(img, widthMm, bandH, false, botLabels);
-  pdf.addImage(botUrl, "PNG", ox, y, widthMm, bandMm);
+  // Top band (blurred, mirrored), fading down into the mirrored image
+  const topUrl = renderPdfBand(img, widthMm, bandH, fadeZone, "top", topLabels);
+  pdf.addImage(topUrl, "PNG", ox, oy, widthMm, bandMm + fadeMm);
+
+  // Bottom band (blurred, mirrored), fading up into the front image
+  const botUrl = renderPdfBand(
+    img,
+    widthMm,
+    bandH,
+    fadeZone,
+    "bottom",
+    botLabels,
+  );
+  pdf.addImage(botUrl, "PNG", ox, botBandY - fadeMm, widthMm, bandMm + fadeMm);
 }
 
-export async function generatePdf(entries: MiniFigEntry[], format: PaperFormat = "a4", catalogueName = "paper-minis"): Promise<void> {
+export async function generatePdf(
+  entries: MiniFigEntry[],
+  format: PaperFormat = "a4",
+  catalogueName = "paper-minis",
+): Promise<void> {
   await fontReady;
   const validEntries = entries.filter((e) => e.imageDataUrl);
   if (validEntries.length === 0) return;
@@ -446,7 +594,7 @@ export async function generatePdf(entries: MiniFigEntry[], format: PaperFormat =
         img,
         widthMm,
         entry.showName && !!entry.name,
-        number != null
+        number != null,
       );
       allMinis.push({
         img,
@@ -492,18 +640,25 @@ export async function generatePdf(entries: MiniFigEntry[], format: PaperFormat =
     pageX += mini.widthMm + SPACING_MM;
   }
 
-  const safeName = catalogueName.replace(/[^a-z0-9_\-\s]/gi, "").trim() || "paper-minis";
+  const safeName =
+    catalogueName.replace(/[^a-z0-9_\-\s]/gi, "").trim() || "paper-minis";
   pdf.save(`${safeName}.pdf`);
 }
 
 export async function renderPreview(
   entry: MiniFigEntry,
-  number: number | null
+  number: number | null,
 ): Promise<string> {
   await fontReady;
   if (!entry.imageDataUrl) return "";
   const img = await loadImage(entry.imageDataUrl);
   const widthMm = getEffectiveWidthMm(entry);
-  const canvas = drawMiniFigToCanvas(img, entry.name, entry.showName, number, widthMm);
+  const canvas = drawMiniFigToCanvas(
+    img,
+    entry.name,
+    entry.showName,
+    number,
+    widthMm,
+  );
   return canvas.toDataURL("image/png");
 }
