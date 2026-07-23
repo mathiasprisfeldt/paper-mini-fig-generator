@@ -105,31 +105,41 @@ function normalizeSource(value: unknown): CreatureSource | null {
 
 export class DriveAuthError extends Error {}
 
+let googleIdentityServicesPromise: Promise<void> | null = null;
+
 function loadGoogleIdentityServices(): Promise<void> {
   if (window.google?.accounts.oauth2) return Promise.resolve();
+  if (googleIdentityServicesPromise) return googleIdentityServicesPromise;
 
-  return new Promise((resolve, reject) => {
+  const loadingPromise = new Promise<void>((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>(
       `script[src="${GIS_SCRIPT_URL}"]`,
     );
 
-    const onLoad = () => resolve();
+    const onLoad = () => {
+      if (window.google?.accounts.oauth2) {
+        resolve();
+        return;
+      }
+      reject(new Error("Google sign-in did not initialize."));
+    };
     const onError = () => reject(new Error("Could not load Google sign-in."));
-
-    if (existing) {
-      existing.addEventListener("load", onLoad, { once: true });
-      existing.addEventListener("error", onError, { once: true });
-      return;
-    }
 
     const script = document.createElement("script");
     script.src = GIS_SCRIPT_URL;
     script.async = true;
     script.defer = true;
+    if (existing?.nonce) script.nonce = existing.nonce;
     script.addEventListener("load", onLoad, { once: true });
     script.addEventListener("error", onError, { once: true });
     document.head.appendChild(script);
+  }).catch((error) => {
+    googleIdentityServicesPromise = null;
+    throw error;
   });
+  googleIdentityServicesPromise = loadingPromise;
+
+  return loadingPromise;
 }
 
 export async function connectGoogleDrive(clientId: string): Promise<string> {
