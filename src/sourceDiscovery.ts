@@ -10,10 +10,10 @@ export interface DiscoveredCreature {
   imageDriveFileId: string | null;
 }
 
-export class SourceCorsError extends Error {
+export class SourceAccessError extends Error {
   constructor(sourceUrl: string, options?: ErrorOptions) {
-    super(`Browser access to ${new URL(sourceUrl).hostname} was blocked.`, options);
-    this.name = "SourceCorsError";
+    super(`The browser could not reach ${new URL(sourceUrl).hostname}.`, options);
+    this.name = "SourceAccessError";
   }
 }
 
@@ -47,7 +47,7 @@ export async function discoverSourceCreatures(
   try {
     response = await fetch(source.url, { mode: "cors" });
   } catch (error) {
-    throw new SourceCorsError(source.url, { cause: error });
+    throw new SourceAccessError(source.url, { cause: error });
   }
   if (response.status === 455) {
     throw new Error(

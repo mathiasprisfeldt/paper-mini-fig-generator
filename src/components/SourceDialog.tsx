@@ -8,7 +8,7 @@ import type {
   DriveCreatureSource,
   HtmlCreatureSource,
 } from "../types";
-import { SourceCorsError } from "../sourceDiscovery";
+import { SourceAccessError } from "../sourceDiscovery";
 import { AppModal } from "./AppModal";
 
 export type SourceDraft =
@@ -89,7 +89,7 @@ export function SourceDialog({
       setMessage(`HTML source added with ${count} creature${count === 1 ? "" : "s"}.`);
       setName("");
     } catch (caught) {
-      setShowCorsHelp(caught instanceof SourceCorsError);
+      setShowCorsHelp(caught instanceof SourceAccessError);
       setError(caught instanceof Error ? caught.message : "Could not read the source.");
     } finally {
       setBusySourceId(null);
@@ -129,7 +129,7 @@ export function SourceDialog({
       const count = await onRefresh(source);
       setMessage(`Refreshed ${source.name}: ${count} creature${count === 1 ? "" : "s"}.`);
     } catch (caught) {
-      setShowCorsHelp(caught instanceof SourceCorsError);
+      setShowCorsHelp(caught instanceof SourceAccessError);
       setError(caught instanceof Error ? caught.message : "Could not refresh the source.");
     } finally {
       setBusySourceId(null);
@@ -241,12 +241,12 @@ export function SourceDialog({
         {error && <p className="form-error">{error}</p>}
         {showCorsHelp && (
           <div className="cors-help" role="alert">
-            <strong>The image host needs to allow this app</strong>
-            <p>This is a server setting; changing the selector will not fix it. The owner must return this header for the directory page and every image:</p>
+            <strong>The browser could not read this source</strong>
+            <p>First confirm the source opens in another tab. If it does, the most likely cause is a cross-origin (CORS) restriction; changing the selector will not fix it. The owner must return this header for the directory page and every image:</p>
             <pre>Access-Control-Allow-Origin: *</pre>
             <p>For Apache, add this to the site's <code>.htaccess</code> file:</p>
             <pre>{`<IfModule mod_headers.c>\n  Header always set Access-Control-Allow-Origin "*"\n  Header always set Access-Control-Allow-Methods "GET, OPTIONS"\n</IfModule>`}</pre>
-            <p>If it still fails, check the hosting provider's firewall/WAF logs and allow cross-origin GET requests to the image directory.</p>
+            <p>If it still fails, check the connection, DNS, and hosting provider's firewall/WAF logs, then allow cross-origin GET requests to the image directory.</p>
           </div>
         )}
 
