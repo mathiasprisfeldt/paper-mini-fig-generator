@@ -15,6 +15,7 @@ const MANIFEST_NAME = "paper-mini-fig-catalogues.json";
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
 const DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive/v3";
 const GIS_SCRIPT_URL = "https://accounts.google.com/gsi/client";
+const DRIVE_DOWNLOAD_CONCURRENCY = 6;
 
 interface GoogleTokenResponse {
   access_token?: string;
@@ -313,6 +314,27 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index], index);
+    }
+  }
+
+  const workerCount = Math.min(concurrency, items.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
+
 export async function discoverDriveFolderCreatures(
   accessToken: string,
   source: DriveCreatureSource,
@@ -340,13 +362,17 @@ export async function discoverDriveFolderCreatures(
     pageToken = result.nextPageToken;
   } while (pageToken);
 
-  return Promise.all(files.map(async (file) => ({
-    id: `source-${source.id}-${file.id}`,
-    name: file.name.replace(/\.[^.]+$/, ""),
-    imageDataUrl: await blobToDataUrl(await downloadFile(accessToken, file.id)),
-    imageUrl: null,
-    imageDriveFileId: file.id,
-  })));
+  return mapWithConcurrency(
+    files,
+    DRIVE_DOWNLOAD_CONCURRENCY,
+    async (file) => ({
+      id: `source-${source.id}-${file.id}`,
+      name: file.name.replace(/\.[^.]+$/, ""),
+      imageDataUrl: await blobToDataUrl(await downloadFile(accessToken, file.id)),
+      imageUrl: null,
+      imageDriveFileId: file.id,
+    }),
+  );
 }
 
 function imageExtension(mimeType: string): string {
