@@ -100,7 +100,7 @@ const CREATURE_SIZE_MULTIPLIERS: Record<CreatureSize, number> = {
   gargantuan: 4,
 };
 
-function getEffectiveWidthMm(entry: MiniFigEntry): number {
+export function getEffectiveWidthMm(entry: MiniFigEntry): number {
   return entry.miniSize * CREATURE_SIZE_MULTIPLIERS[entry.creatureSize];
 }
 
@@ -144,12 +144,17 @@ function miniHeightMm(
   return STAND_BUFFER_MM + labels + imgH * 2 + labels + STAND_BUFFER_MM;
 }
 
-function loadImage(dataUrl: string): Promise<HTMLImageElement> {
+export function getEntryImageSource(entry: MiniFigEntry): string | null {
+  return entry.imageDataUrl || entry.imageUrl;
+}
+
+function loadImage(source: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = dataUrl;
+    img.onerror = () => reject(new Error(`Could not load image: ${source}`));
+    if (/^https?:\/\//i.test(source)) img.crossOrigin = "anonymous";
+    img.src = source;
   });
 }
 
@@ -576,7 +581,9 @@ export async function generatePdf(
   catalogueName = "paper-minis",
 ): Promise<void> {
   await fontReady;
-  const validEntries = entries.filter((e) => e.imageDataUrl);
+  const validEntries = entries.filter(
+    (entry) => entry.quantity > 0 && getEntryImageSource(entry),
+  );
   if (validEntries.length === 0) return;
 
   const { widthMm: pageW, heightMm: pageH } = PAPER_SIZES[format];
@@ -586,7 +593,7 @@ export async function generatePdf(
   const allMinis: MiniPdfData[] = [];
 
   for (const entry of validEntries) {
-    const img = await loadImage(entry.imageDataUrl!);
+    const img = await loadImage(getEntryImageSource(entry)!);
     const widthMm = getEffectiveWidthMm(entry);
     for (let i = 0; i < entry.quantity; i++) {
       const number = entry.quantity > 1 ? i + 1 : null;
@@ -650,8 +657,9 @@ export async function renderPreview(
   number: number | null,
 ): Promise<string> {
   await fontReady;
-  if (!entry.imageDataUrl) return "";
-  const img = await loadImage(entry.imageDataUrl);
+  const source = getEntryImageSource(entry);
+  if (!source) return "";
+  const img = await loadImage(source);
   const widthMm = getEffectiveWidthMm(entry);
   const canvas = drawMiniFigToCanvas(
     img,
