@@ -10,9 +10,17 @@ export interface DiscoveredCreature {
   imageDriveFileId: string | null;
 }
 
+function sourceLabel(sourceUrl: string): string {
+  try {
+    return new URL(sourceUrl).hostname || sourceUrl;
+  } catch {
+    return sourceUrl;
+  }
+}
+
 export class SourceAccessError extends Error {
   constructor(sourceUrl: string, options?: ErrorOptions) {
-    super(`The browser could not reach ${new URL(sourceUrl).hostname}.`, options);
+    super(`The browser could not reach ${sourceLabel(sourceUrl)}.`, options);
     this.name = "SourceAccessError";
   }
 }
