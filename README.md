@@ -47,7 +47,8 @@ Users connect their own Google account. The app writes a
 Drive's hidden `appDataFolder`. Linked images remain external URLs in the
 manifest, so they do not consume additional Drive storage. Only this app can
 access the hidden files, and they do not appear in the user's regular Drive
-folders. The app requests only the `drive.appdata` scope.
+folders. The app requests `drive.appdata` for its hidden storage and
+`drive.file` for folders the user explicitly selects through Google Picker.
 
 1. Create or select a project in the
    [Google Cloud console](https://console.cloud.google.com/).
