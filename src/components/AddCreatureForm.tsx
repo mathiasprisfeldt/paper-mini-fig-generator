@@ -39,21 +39,20 @@ async function validateImageUrl(value: string): Promise<string> {
     throw new Error("The image URL must use http or https.");
   }
 
+  let response: Response;
   try {
-    const response = await fetch(url.toString(), { mode: "cors" });
-    if (!response.ok) throw new Error(`The image host returned ${response.status}.`);
-    const blob = await response.blob();
-    if (!blob.type.startsWith("image/")) {
-      throw new Error("That URL does not return an image.");
-    }
+    response = await fetch(url.toString(), { mode: "cors" });
   } catch (error) {
-    if (error instanceof Error && !error.message.includes("Failed to fetch")) {
-      throw error;
-    }
     throw new Error(
-      "The image host blocked browser access. Enable CORS for this site or upload the file instead.",
+      "The browser could not read this image. The host may be blocking cross-origin access, or the network may be unavailable. Enable CORS for the site or upload the file instead.",
       { cause: error },
     );
+  }
+  if (!response.ok) throw new Error(`The image host returned ${response.status}.`);
+
+  const blob = await response.blob();
+  if (!blob.type.startsWith("image/")) {
+    throw new Error("That URL does not return an image.");
   }
 
   return url.toString();
