@@ -78,9 +78,11 @@ folders. The app requests `drive.appdata` for its hidden storage and
    VITE_GOOGLE_API_KEY=your-restricted-picker-api-key
    ```
 
-For GitHub Pages, create Actions repository variables named `GOOGLE_CLIENT_ID`,
-`GOOGLE_APP_ID`, and `GOOGLE_API_KEY`. They are public browser configuration,
-not secrets. The OAuth web client does not use a client secret.
+For GitHub Pages, create Actions repository secrets named `GOOGLE_CLIENT_ID`,
+`GOOGLE_APP_ID`, and `GOOGLE_API_KEY`. The workflows read these values from the
+`secrets` context. Vite includes them in the browser bundle, so they must still
+be treated as public browser configuration; the OAuth web client does not use a
+client secret.
 
 Drive access tokens are kept in memory and expire after a short period. The app
 asks the user to reconnect when needed. After an explicit **Load from Drive** or
