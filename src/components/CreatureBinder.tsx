@@ -68,6 +68,7 @@ export function CreatureBinder({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search creatures…"
+            aria-label="Search creatures"
           />
           <div className="source-button-group">
             <button className="btn btn-secondary" onClick={onManageSources}>Sources</button>
