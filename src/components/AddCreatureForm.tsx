@@ -38,6 +38,11 @@ async function validateImageUrl(value: string): Promise<string> {
   if (!['http:', 'https:'].includes(url.protocol)) {
     throw new Error("The image URL must use http or https.");
   }
+  if (window.location.protocol === "https:" && url.protocol === "http:") {
+    throw new Error(
+      "Use an https:// image URL. Browsers block http:// images on secure pages.",
+    );
+  }
 
   let response: Response;
   try {
