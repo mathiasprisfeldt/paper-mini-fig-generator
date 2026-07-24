@@ -213,7 +213,7 @@ async function findAppDataFile(
 ): Promise<DriveFile | null> {
   const params = new URLSearchParams({
     spaces: "appDataFolder",
-    q: `name = '${name.replaceAll("'", "\\'")}'`,
+    q: `name = '${name.replaceAll("'", "\\'")}' and trashed = false`,
     fields: "files(id,name)",
     pageSize: "1",
   });
