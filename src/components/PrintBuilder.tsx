@@ -90,15 +90,30 @@ export function PrintBuilder({
                   <span>{entry.creatureSize} · {entry.miniSize}mm</span>
                 </div>
                 <div className="quantity-stepper" aria-label={`${entry.name} quantity`}>
-                  <button onClick={() => onQuantityChange(entry.id, entry.quantity - 1)} disabled={entry.quantity === 0}>−</button>
+                  <button
+                    type="button"
+                    aria-label={`Decrease ${entry.name || "unnamed creature"} quantity`}
+                    onClick={() => onQuantityChange(entry.id, entry.quantity - 1)}
+                    disabled={entry.quantity === 0}
+                  >
+                    −
+                  </button>
                   <input
                     type="number"
+                    aria-label={`${entry.name || "Unnamed creature"} quantity`}
                     min={0}
                     max={99}
                     value={entry.quantity}
                     onChange={(event) => onQuantityChange(entry.id, Number(event.target.value))}
                   />
-                  <button onClick={() => onQuantityChange(entry.id, entry.quantity + 1)} disabled={entry.quantity >= 99}>+</button>
+                  <button
+                    type="button"
+                    aria-label={`Increase ${entry.name || "unnamed creature"} quantity`}
+                    onClick={() => onQuantityChange(entry.id, entry.quantity + 1)}
+                    disabled={entry.quantity >= 99}
+                  >
+                    +
+                  </button>
                 </div>
               </article>
             ))}
