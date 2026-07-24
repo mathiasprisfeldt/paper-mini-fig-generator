@@ -63,7 +63,14 @@ export function AppModal({
         aria-labelledby={ariaLabelledBy}
         onKeyDown={onKeyDown}
       >
-        <button className="dialog-close modal-shell-close" onClick={onClose} aria-label="Close">×</button>
+        <button
+          type="button"
+          className="dialog-close modal-shell-close"
+          onClick={onClose}
+          aria-label="Close"
+        >
+          ×
+        </button>
         {children}
       </section>
     </div>
