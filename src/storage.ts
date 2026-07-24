@@ -17,7 +17,7 @@ const VALID_CREATURE_SIZES: CreatureSize[] = [
   "tiny", "small", "medium", "large", "huge", "gargantuan",
 ];
 
-function migrateEntry(e: unknown): MiniFigEntry {
+export function migrateMiniFigEntry(e: unknown): MiniFigEntry {
   const raw = e as Record<string, unknown>;
   return {
     id: (raw.id as string) || crypto.randomUUID(),
@@ -44,7 +44,7 @@ export function loadCatalogues(): Catalogue[] {
     const catalogues = JSON.parse(raw) as Catalogue[];
     return catalogues.map((c) => ({
       ...c,
-      entries: c.entries.map(migrateEntry),
+      entries: c.entries.map(migrateMiniFigEntry),
     }));
   } catch {
     return [];

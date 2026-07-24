@@ -6,6 +6,7 @@ import type {
   PaperFormat,
 } from "./types";
 import type { DiscoveredCreature } from "./sourceDiscovery";
+import { migrateMiniFigEntry } from "./storage";
 
 const DRIVE_SCOPE = [
   "https://www.googleapis.com/auth/drive.appdata",
@@ -521,7 +522,12 @@ export async function loadCataloguesFromDrive(
     throw new Error("The Google Drive catalogue file has an unsupported format.");
   }
 
-  const catalogues = manifest.catalogues.filter(isCatalogue);
+  const catalogues = manifest.catalogues
+    .filter(isCatalogue)
+    .map((catalogue) => ({
+      ...catalogue,
+      entries: catalogue.entries.map(migrateMiniFigEntry),
+    }));
   const hydratedCatalogues = await Promise.all(
     catalogues.map(async (catalogue) => ({
       ...catalogue,
