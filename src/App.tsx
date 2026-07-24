@@ -534,7 +534,10 @@ function App() {
   };
 
   const oversizedCount = entries.filter(
-    (entry) => entry.quantity > 0 && isEntryOversized(entry, paperFormat),
+    (entry) =>
+      entry.quantity > 0 &&
+      Boolean(getEntryImageSource(entry)) &&
+      isEntryOversized(entry, paperFormat),
   ).length;
 
   return (
