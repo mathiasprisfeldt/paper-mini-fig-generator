@@ -91,10 +91,14 @@ export function SourceDialog({
 
   const handleChooseDriveFolder = async () => {
     resetFeedback();
+    if (!accessToken) {
+      setError("Connect Google Drive before choosing a folder.");
+      return;
+    }
     setBusySourceId("new");
     try {
       const folder = await openDriveFolderPicker({
-        accessToken: accessToken!,
+        accessToken,
         appId,
         developerKey,
         origin: window.location.origin,
