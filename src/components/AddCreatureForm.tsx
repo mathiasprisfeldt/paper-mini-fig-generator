@@ -148,7 +148,6 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
               setSourceMode("upload");
               setError("");
             }}
-            aria-disabled={!uploadEnabled}
             aria-describedby={!uploadEnabled ? "upload-drive-requirement" : undefined}
             title={uploadEnabled ? "Upload an image to Google Drive" : "Connect and sync Google Drive first"}
             data-tooltip={!uploadEnabled ? "Connect Drive and enable autosync to upload images" : undefined}
