@@ -17,6 +17,7 @@ const DRIVE_API = "https://www.googleapis.com/drive/v3";
 const DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive/v3";
 const GIS_SCRIPT_URL = "https://accounts.google.com/gsi/client";
 const DRIVE_DOWNLOAD_CONCURRENCY = 6;
+const DRIVE_SOURCE_IMAGE_LIMIT = 200;
 
 interface GoogleTokenResponse {
   access_token?: string;
@@ -358,7 +359,7 @@ export async function discoverDriveFolderCreatures(
       spaces: "drive",
       q: `'${source.folderId.replaceAll("'", "\\'")}' in parents and trashed = false and mimeType contains 'image/'`,
       fields: "nextPageToken,files(id,name,mimeType)",
-      pageSize: "1000",
+      pageSize: String(DRIVE_SOURCE_IMAGE_LIMIT),
       orderBy: "name",
       includeItemsFromAllDrives: "true",
       supportsAllDrives: "true",
@@ -370,6 +371,14 @@ export async function discoverDriveFolderCreatures(
     );
     const result = (await response.json()) as DriveFileList;
     files.push(...(result.files ?? []));
+    if (
+      files.length > DRIVE_SOURCE_IMAGE_LIMIT ||
+      (files.length === DRIVE_SOURCE_IMAGE_LIMIT && result.nextPageToken)
+    ) {
+      throw new Error(
+        `This Drive folder contains more than ${DRIVE_SOURCE_IMAGE_LIMIT} images. Choose a smaller folder to keep browser memory use manageable.`,
+      );
+    }
     pageToken = result.nextPageToken;
   } while (pageToken);
 
