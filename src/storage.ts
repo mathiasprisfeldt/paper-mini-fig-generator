@@ -160,7 +160,13 @@ export function loadSources(): CreatureSource[] {
         });
         continue;
       }
-      if (typeof source.url !== "string" || typeof source.selector !== "string") continue;
+      if (
+        source.type !== "html" ||
+        typeof source.url !== "string" ||
+        typeof source.selector !== "string"
+      ) {
+        continue;
+      }
       sources.push({
         type: "html" as const,
         id: source.id,
