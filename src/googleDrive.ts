@@ -135,7 +135,10 @@ function normalizeSource(value: unknown): CreatureSource | null {
   if (!value || typeof value !== "object") return null;
   const source = value as Record<string, unknown>;
   if (typeof source.id !== "string" || typeof source.name !== "string") return null;
-  const updatedAt = typeof source.updatedAt === "number" ? source.updatedAt : 0;
+  const updatedAt =
+    typeof source.updatedAt === "number" && Number.isFinite(source.updatedAt)
+      ? source.updatedAt
+      : 0;
   if (
     source.type === "drive" &&
     typeof source.folderId === "string" &&

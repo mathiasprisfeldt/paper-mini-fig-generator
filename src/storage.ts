@@ -144,7 +144,10 @@ export function loadSources(): CreatureSource[] {
       if (!value || typeof value !== "object") continue;
       const source = value as Partial<CreatureSource> & Record<string, unknown>;
       if (typeof source.id !== "string" || typeof source.name !== "string") continue;
-      const updatedAt = typeof source.updatedAt === "number" ? source.updatedAt : 0;
+      const updatedAt =
+        typeof source.updatedAt === "number" && Number.isFinite(source.updatedAt)
+          ? source.updatedAt
+          : 0;
       if (
         source.type === "drive" &&
         typeof source.folderId === "string" &&
