@@ -625,7 +625,7 @@ export async function discoverDriveFolderCreatures(
   }));
 }
 
-export async function loadDriveSourceImages(
+export async function loadDriveImages(
   accessToken: string,
   entries: MiniFigEntry[],
 ): Promise<MiniFigEntry[]> {
@@ -633,7 +633,11 @@ export async function loadDriveSourceImages(
     entries,
     DRIVE_DOWNLOAD_CONCURRENCY,
     async (entry) => {
-      if (!entry.sourceId || !entry.imageDriveFileId || entry.imageDataUrl) {
+      if (
+        !entry.imageDriveFileId ||
+        entry.imageDataUrl ||
+        entry.imageUrl
+      ) {
         return entry;
       }
       const blob = await downloadFile(accessToken, entry.imageDriveFileId);

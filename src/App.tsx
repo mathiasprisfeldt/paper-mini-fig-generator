@@ -26,7 +26,7 @@ import {
   downloadDriveBackup,
   DriveAuthError,
   loadCataloguesFromDrive,
-  loadDriveSourceImages,
+  loadDriveImages,
   saveCataloguesToDrive,
 } from "./googleDrive";
 import {
@@ -465,13 +465,13 @@ function App() {
     entriesToResolve: MiniFigEntry[],
   ): Promise<MiniFigEntry[]> => {
     const needsDrive = entriesToResolve.some(
-      (entry) => entry.sourceId && entry.imageDriveFileId && !entry.imageDataUrl,
+      (entry) => entry.imageDriveFileId && !getEntryImageSource(entry),
     );
     if (!needsDrive) return entriesToResolve;
     if (!driveAccessToken) {
-      throw new Error("Connect Google Drive to load this creature for export.");
+      throw new Error("Connect Google Drive to load this creature.");
     }
-    return loadDriveSourceImages(driveAccessToken, entriesToResolve);
+    return loadDriveImages(driveAccessToken, entriesToResolve);
   }, [driveAccessToken]);
 
   const resolvePreviewEntry = useCallback(async (
