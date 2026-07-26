@@ -386,16 +386,26 @@ export async function discoverDriveFolderCreatures(
     pageToken = result.nextPageToken;
   } while (pageToken);
 
-  return mapWithConcurrency(
+  const discovered = await mapWithConcurrency(
     files,
     DRIVE_DOWNLOAD_CONCURRENCY,
-    async (file) => ({
-      id: `source-${source.id}-${file.id}`,
-      name: file.name.replace(/\.[^.]+$/, ""),
-      imageDataUrl: await blobToDataUrl(await downloadFile(accessToken, file.id)),
-      imageUrl: null,
-      imageDriveFileId: file.id,
-    }),
+    async (file): Promise<DiscoveredCreature | null> => {
+      try {
+        return {
+          id: `source-${source.id}-${file.id}`,
+          name: file.name.replace(/\.[^.]+$/, ""),
+          imageDataUrl: await blobToDataUrl(await downloadFile(accessToken, file.id)),
+          imageUrl: null,
+          imageDriveFileId: file.id,
+        };
+      } catch (error) {
+        if (error instanceof DriveAuthError) throw error;
+        return null;
+      }
+    },
+  );
+  return discovered.filter(
+    (creature): creature is DiscoveredCreature => creature !== null,
   );
 }
 
