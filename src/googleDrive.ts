@@ -150,7 +150,11 @@ function normalizeSource(value: unknown): CreatureSource | null {
       updatedAt,
     };
   }
-  if (typeof source.url === "string" && typeof source.selector === "string") {
+  if (
+    source.type === "html" &&
+    typeof source.url === "string" &&
+    typeof source.selector === "string"
+  ) {
     return {
       type: "html",
       id: source.id,
