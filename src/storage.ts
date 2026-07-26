@@ -79,12 +79,24 @@ export function saveCatalogues(catalogues: Catalogue[]): void {
   // Newly selected images are never added to localStorage.
   const legacyImages = new Map<string, string>();
   try {
-    const existing = JSON.parse(
+    const existing: unknown = JSON.parse(
       localStorage.getItem(CATALOGUES_KEY) || "[]",
-    ) as Catalogue[];
-    for (const catalogue of existing) {
-      for (const entry of catalogue.entries) {
-        if (entry.imageDataUrl) legacyImages.set(entry.id, entry.imageDataUrl);
+    );
+    if (Array.isArray(existing)) {
+      for (const value of existing) {
+        if (!value || typeof value !== "object") continue;
+        const catalogue = value as Record<string, unknown>;
+        if (!Array.isArray(catalogue.entries)) continue;
+        for (const entryValue of catalogue.entries) {
+          if (!entryValue || typeof entryValue !== "object") continue;
+          const entry = entryValue as Record<string, unknown>;
+          if (
+            typeof entry.id === "string" &&
+            typeof entry.imageDataUrl === "string"
+          ) {
+            legacyImages.set(entry.id, entry.imageDataUrl);
+          }
+        }
       }
     }
   } catch {
