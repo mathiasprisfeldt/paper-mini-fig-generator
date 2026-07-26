@@ -83,8 +83,9 @@ async function validateImageUrl(value: string): Promise<string> {
   }
   if (!response.ok) throw new Error(`The image host returned ${response.status}.`);
 
-  const blob = await response.blob();
-  if (!blob.type.startsWith("image/")) {
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  await response.body?.cancel();
+  if (!contentType.startsWith("image/")) {
     throw new Error("That URL does not return an image.");
   }
 
