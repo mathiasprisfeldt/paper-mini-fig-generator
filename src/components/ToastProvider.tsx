@@ -17,9 +17,11 @@ interface Props {
 }
 
 const DEFAULT_DURATION = 5000;
+const MAX_VISIBLE_TOASTS = 4;
 
 export function ToastProvider({ children }: Props) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const visibleToasts = useRef<ToastItem[]>([]);
   const timers = useRef(new Map<string, number>());
 
   const dismissToast = useCallback((id: string) => {
@@ -28,21 +30,41 @@ export function ToastProvider({ children }: Props) {
       window.clearTimeout(timer);
       timers.current.delete(id);
     }
-    setToasts((current) => current.filter((toast) => toast.id !== id));
+    const next = visibleToasts.current.filter((toast) => toast.id !== id);
+    visibleToasts.current = next;
+    setToasts(next);
   }, []);
 
   const showToast = useCallback((input: ToastInput) => {
     const id = crypto.randomUUID();
     const duration = input.duration ?? DEFAULT_DURATION;
-    setToasts((current) => [
-      ...current.slice(-3),
-      { ...input, id, tone: input.tone ?? "info" },
-    ]);
+    const nextToast: ToastItem = {
+      ...input,
+      id,
+      tone: input.tone ?? "info",
+    };
+    const combined = [...visibleToasts.current, nextToast];
+    const dropped = combined.slice(
+      0,
+      Math.max(0, combined.length - MAX_VISIBLE_TOASTS),
+    );
+    for (const toast of dropped) {
+      const timer = timers.current.get(toast.id);
+      if (timer !== undefined) window.clearTimeout(timer);
+      timers.current.delete(toast.id);
+    }
+    const next = combined.slice(-MAX_VISIBLE_TOASTS);
+    visibleToasts.current = next;
+    setToasts(next);
 
     if (duration > 0) {
       const timer = window.setTimeout(() => {
         timers.current.delete(id);
-        setToasts((current) => current.filter((toast) => toast.id !== id));
+        const remaining = visibleToasts.current.filter(
+          (toast) => toast.id !== id,
+        );
+        visibleToasts.current = remaining;
+        setToasts(remaining);
       }, duration);
       timers.current.set(id, timer);
     }
