@@ -152,7 +152,14 @@ function loadImage(source: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error(`Could not load image: ${source}`));
+    img.onerror = () => {
+      const description = source.startsWith("data:")
+        ? "embedded data URL"
+        : source.length > 200
+          ? `${source.slice(0, 197)}...`
+          : source;
+      reject(new Error(`Could not load image: ${description}`));
+    };
     if (/^https?:\/\//i.test(source)) img.crossOrigin = "anonymous";
     img.src = source;
   });
