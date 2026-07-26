@@ -113,7 +113,9 @@ function createDriveSyncSignature(
       entries: catalogue.entries.map((entry) => ({
         id: entry.id,
         name: entry.name,
-        imageData: hashImageData(entry.imageDataUrl),
+        imageData: entry.imageDriveFileId
+          ? null
+          : hashImageData(entry.imageDataUrl),
         imageUrl: entry.imageUrl,
         sourceId: entry.sourceId,
         quantity: entry.quantity,
