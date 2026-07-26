@@ -295,7 +295,10 @@ async function downloadFile(
   accessToken: string,
   fileId: string,
 ): Promise<Blob> {
-  const params = new URLSearchParams({ alt: "media" });
+  const params = new URLSearchParams({
+    alt: "media",
+    supportsAllDrives: "true",
+  });
   const response = await driveFetch(
     accessToken,
     `${DRIVE_API}/files/${encodeURIComponent(fileId)}?${params.toString()}`,
@@ -304,9 +307,10 @@ async function downloadFile(
 }
 
 async function deleteFile(accessToken: string, fileId: string): Promise<void> {
+  const params = new URLSearchParams({ supportsAllDrives: "true" });
   await driveFetch(
     accessToken,
-    `${DRIVE_API}/files/${encodeURIComponent(fileId)}`,
+    `${DRIVE_API}/files/${encodeURIComponent(fileId)}?${params.toString()}`,
     { method: "DELETE" },
   );
 }
