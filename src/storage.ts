@@ -19,6 +19,10 @@ const VALID_CREATURE_SIZES: CreatureSize[] = [
 
 export function migrateMiniFigEntry(e: unknown): MiniFigEntry {
   const raw = e as Record<string, unknown>;
+  const quantity =
+    typeof raw.quantity === "number" && Number.isFinite(raw.quantity)
+      ? Math.min(99, Math.max(0, Math.trunc(raw.quantity)))
+      : 1;
   return {
     id: (raw.id as string) || crypto.randomUUID(),
     name: (raw.name as string) || "",
@@ -26,7 +30,7 @@ export function migrateMiniFigEntry(e: unknown): MiniFigEntry {
     imageUrl: (raw.imageUrl as string | null) ?? null,
     imageDriveFileId: (raw.imageDriveFileId as string | null) ?? null,
     sourceId: (raw.sourceId as string | null) ?? null,
-    quantity: typeof raw.quantity === "number" ? raw.quantity : 1,
+    quantity,
     showName: typeof raw.showName === "boolean" ? raw.showName : true,
     miniSize: VALID_MINI_SIZES.includes(raw.miniSize as MiniSize)
       ? (raw.miniSize as MiniSize)
