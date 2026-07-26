@@ -767,7 +767,11 @@ function App() {
           ) {
             continue;
           }
-          lastDriveSyncSignature.current = payload.signature;
+          lastDriveSyncSignature.current = createDriveSyncSignature(
+            saved.catalogues,
+            payload.paperFormat,
+            payload.sources,
+          );
           applyDriveFileIds(saved.catalogues);
           setDriveStatus("synced");
           setDriveMessage(
