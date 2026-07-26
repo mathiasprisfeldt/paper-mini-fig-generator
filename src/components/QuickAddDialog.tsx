@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getEntryImageSource } from "../generatePdf";
+import { DriveCreatureImage } from "../driveImages";
 import type { MiniFigEntry } from "../types";
 import { AppModal } from "./AppModal";
 
@@ -126,7 +126,7 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => addCreature(entry)}
             >
-              <img src={getEntryImageSource(entry) ?? undefined} alt="" />
+              <DriveCreatureImage entry={entry} alt="" />
               <span className="quick-add-result-copy">
                 <strong>{entry.name || "Unnamed creature"}</strong>
                 <small>{entry.creatureSize} · {entry.miniSize}mm</small>

@@ -14,8 +14,7 @@ interface Props {
   autosyncEnabled: boolean;
   onConnect: () => void;
   onDisconnect: () => void;
-  onLoad: () => void;
-  onSave: () => void;
+  onDownloadBackup: () => void;
 }
 
 export function GoogleDriveSync({
@@ -26,8 +25,7 @@ export function GoogleDriveSync({
   autosyncEnabled,
   onConnect,
   onDisconnect,
-  onLoad,
-  onSave,
+  onDownloadBackup,
 }: Props) {
   const busy = status === "connecting" || status === "syncing";
 
@@ -59,18 +57,23 @@ export function GoogleDriveSync({
             onClick={onConnect}
             disabled={!configured || busy}
           >
-            {status === "connecting" ? "Connecting…" : "Connect Drive"}
+            {status === "connecting"
+              ? "Connecting…"
+              : status === "syncing"
+                ? "Loading Drive…"
+                : "Connect Drive"}
           </button>
         ) : (
           <>
+            <button
+              className="btn btn-secondary"
+              onClick={onDownloadBackup}
+              disabled={busy}
+            >
+              {status === "syncing" ? "Syncing…" : "Download backup"}
+            </button>
             <button className="btn btn-secondary btn-disconnect" onClick={onDisconnect}>
               Disconnect
-            </button>
-            <button className="btn btn-secondary" onClick={onLoad} disabled={busy}>
-              Load from Drive
-            </button>
-            <button className="btn btn-drive" onClick={onSave} disabled={busy}>
-              {status === "syncing" ? "Saving…" : "Save to Drive"}
             </button>
           </>
         )}

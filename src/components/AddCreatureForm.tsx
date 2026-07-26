@@ -17,6 +17,34 @@ const CREATURE_SIZES: CreatureSize[] = [
 ];
 const MINI_SIZES: MiniSize[] = [24, 28, 32];
 
+function readableImageName(value: string): string {
+  const withoutExtension = value.replace(/\.[^.]+$/, "");
+  return (withoutExtension || value)
+    .replace(/_+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function nameFromFile(file: File): string {
+  return readableImageName(file.name);
+}
+
+function nameFromImageUrl(value: string): string | null {
+  try {
+    const filename = new URL(value).pathname.split("/").pop();
+    if (!filename) return null;
+    let decoded = filename;
+    try {
+      decoded = decodeURIComponent(filename);
+    } catch {
+      // Keep the encoded filename if it contains malformed escapes.
+    }
+    return readableImageName(decoded) || null;
+  } catch {
+    return null;
+  }
+}
+
 function readFile(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -65,6 +93,7 @@ async function validateImageUrl(value: string): Promise<string> {
 
 export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const suggestedName = useRef<string | null>(null);
   const [sourceMode, setSourceMode] = useState<"upload" | "url">(
     uploadEnabled ? "upload" : "url",
   );
@@ -78,11 +107,49 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
   const [adding, setAdding] = useState(false);
 
   const reset = () => {
+    suggestedName.current = null;
     setName("");
     setFile(null);
     setImageUrl("");
     setError("");
     if (inputRef.current) inputRef.current.value = "";
+  };
+
+  const handleFileChange = (selectedFile: File | null) => {
+    setFile(selectedFile);
+    setError("");
+    setName((currentName) => {
+      const previousSuggestion = suggestedName.current;
+      if (!selectedFile) {
+        suggestedName.current = null;
+        return currentName === previousSuggestion ? "" : currentName;
+      }
+
+      const nextSuggestion = nameFromFile(selectedFile);
+      if (!currentName.trim() || currentName === previousSuggestion) {
+        suggestedName.current = nextSuggestion;
+        return nextSuggestion;
+      }
+      return currentName;
+    });
+  };
+
+  const handleImageUrlChange = (value: string) => {
+    setImageUrl(value);
+    setError("");
+    setName((currentName) => {
+      const previousSuggestion = suggestedName.current;
+      const nextSuggestion = nameFromImageUrl(value);
+      if (!nextSuggestion) {
+        suggestedName.current = null;
+        return currentName === previousSuggestion ? "" : currentName;
+      }
+      if (!currentName.trim() || currentName === previousSuggestion) {
+        suggestedName.current = nextSuggestion;
+        return nextSuggestion;
+      }
+      return currentName;
+    });
   };
 
   const handleAdd = async () => {
@@ -169,7 +236,10 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
           <span>Name</span>
           <input
             value={name}
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => {
+              suggestedName.current = null;
+              setName(event.target.value);
+            }}
             placeholder="e.g. Owlbear"
           />
         </label>
@@ -181,7 +251,9 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
               ref={inputRef}
               type="file"
               accept="image/*"
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              onChange={(event) =>
+                handleFileChange(event.target.files?.[0] ?? null)
+              }
             />
           </label>
         ) : (
@@ -190,7 +262,7 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
             <input
               type="url"
               value={imageUrl}
-              onChange={(event) => setImageUrl(event.target.value)}
+              onChange={(event) => handleImageUrlChange(event.target.value)}
               placeholder="https://example.com/images/owlbear.png"
             />
           </label>

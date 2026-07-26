@@ -1,5 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { Catalogue, CreatureSource, MiniFigEntry, PaperFormat } from "./types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type {
+  Catalogue,
+  CreatureSource,
+  MiniFigEntry,
+  PaperFormat,
+  SourceRefreshResult,
+} from "./types";
 import { AddCreatureForm } from "./components/AddCreatureForm";
 import { AppModal } from "./components/AppModal";
 import { CreatureBinder } from "./components/CreatureBinder";
@@ -7,6 +13,7 @@ import { ExportPreviewDialog } from "./components/ExportPreviewDialog";
 import { PrintBuilder } from "./components/PrintBuilder";
 import { QuickAddDialog } from "./components/QuickAddDialog";
 import { SourceDialog, type SourceDraft } from "./components/SourceDialog";
+import { DriveImageProvider } from "./driveImages";
 import {
   GoogleDriveSync,
   type DriveSyncStatus,
@@ -16,30 +23,52 @@ import { discoverSourceCreatures, type DiscoveredCreature } from "./sourceDiscov
 import {
   connectGoogleDrive,
   discoverDriveFolderCreatures,
+  downloadDriveBackup,
   DriveAuthError,
   loadCataloguesFromDrive,
+  loadDriveSourceImages,
   saveCataloguesToDrive,
 } from "./googleDrive";
 import {
+  clearDriveSessionCredential,
   createCatalogue,
+  getDriveConnectionPreference,
+  getDriveSessionCredential,
   getPaperFormat,
   loadSources,
   loadCatalogues,
   saveCatalogues,
   saveSources,
+  setDriveConnectionPreference,
+  setDriveSessionCredential,
   setPaperFormat as savePaperFormat,
 } from "./storage";
 import "./App.css";
 
-type AppView = "binder" | "print";
+type AppView = "binder" | "print" | "settings";
 type AppModalId = "add-creature" | "sources" | "quick-add";
+interface DriveSyncPayload {
+  accessToken: string;
+  catalogues: Catalogue[];
+  paperFormat: PaperFormat;
+  session: number;
+  signature: string;
+  sources: CreatureSource[];
+}
+
 const PREVIEW_QUERY_PARAM = "preview";
 const MODAL_QUERY_PARAM = "modal";
+const SOURCE_QUERY_PARAM = "source";
 const APP_MODALS: AppModalId[] = ["add-creature", "sources", "quick-add"];
+const DRIVE_AUTOSYNC_DELAY_MS = 1000;
 
 function getModalFromUrl(): AppModalId | null {
   const modal = new URL(window.location.href).searchParams.get(MODAL_QUERY_PARAM);
   return APP_MODALS.includes(modal as AppModalId) ? modal as AppModalId : null;
+}
+
+function getSourceFilterFromUrl(): string | null {
+  return new URL(window.location.href).searchParams.get(SOURCE_QUERY_PARAM);
 }
 
 function normalizeAsBinder(catalogues: Catalogue[]): Catalogue[] {
@@ -63,17 +92,43 @@ function normalizeAsBinder(catalogues: Catalogue[]): Catalogue[] {
   }];
 }
 
-function hasNewDriveFileIds(before: Catalogue[], after: Catalogue[]): boolean {
-  const previousIds = new Map(
-    before.flatMap((catalogue) =>
-      catalogue.entries.map((entry) => [entry.id, entry.imageDriveFileId] as const),
-    ),
-  );
-  return after.some((catalogue) =>
-    catalogue.entries.some(
-      (entry) => Boolean(entry.imageDriveFileId) && entry.imageDriveFileId !== previousIds.get(entry.id),
-    ),
-  );
+function hashImageData(value: string | null): string | null {
+  if (!value) return null;
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${value.length}:${hash >>> 0}`;
+}
+
+function createDriveSyncSignature(
+  catalogues: Catalogue[],
+  paperFormat: PaperFormat,
+  sources: CreatureSource[],
+): string {
+  return JSON.stringify({
+    catalogues: catalogues.map((catalogue) => ({
+      ...catalogue,
+      entries: catalogue.entries.map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        imageData: hashImageData(entry.imageDataUrl),
+        imageUrl: entry.imageUrl,
+        sourceId: entry.sourceId,
+        quantity: entry.quantity,
+        showName: entry.showName,
+        miniSize: entry.miniSize,
+        creatureSize: entry.creatureSize,
+      })),
+    })),
+    paperFormat,
+    sources,
+  });
+}
+
+function hasEntryImage(entry: MiniFigEntry): boolean {
+  return Boolean(getEntryImageSource(entry) || entry.imageDriveFileId);
 }
 
 function App() {
@@ -82,11 +137,22 @@ function App() {
   const googleDeveloperKey = import.meta.env.VITE_GOOGLE_API_KEY?.trim() ?? "";
   const googleDriveConfigured = Boolean(googleClientId);
   const googlePickerConfigured = Boolean(googleClientId && googleAppId && googleDeveloperKey);
+  const [initialDriveSession] = useState(
+    () => googleDriveConfigured ? getDriveSessionCredential() : null,
+  );
+  const [restoreDriveOnLoad] = useState(
+    () =>
+      googleDriveConfigured &&
+      (Boolean(initialDriveSession) || getDriveConnectionPreference()),
+  );
   const [catalogues, setCatalogues] = useState<Catalogue[]>(() =>
     normalizeAsBinder(loadCatalogues()),
   );
   const [view, setView] = useState<AppView>("binder");
   const [activeModal, setActiveModal] = useState<AppModalId | null>(getModalFromUrl);
+  const [sourceFilter, setSourceFilter] = useState<string | null>(
+    getSourceFilterFromUrl,
+  );
   const [previewId, setPreviewId] = useState<string | null>(() =>
     new URL(window.location.href).searchParams.get(PREVIEW_QUERY_PARAM),
   );
@@ -94,19 +160,28 @@ function App() {
   const [paperFormat, setPaperFormatState] = useState<PaperFormat>(getPaperFormat);
   const [generating, setGenerating] = useState(false);
   const [exportError, setExportError] = useState("");
-  const [driveAccessToken, setDriveAccessToken] = useState<string | null>(null);
-  const [driveStatus, setDriveStatus] = useState<DriveSyncStatus>("disconnected");
+  const [driveAccessToken, setDriveAccessToken] = useState<string | null>(
+    initialDriveSession?.accessToken ?? null,
+  );
+  const [driveStatus, setDriveStatus] = useState<DriveSyncStatus>(
+    restoreDriveOnLoad ? "connecting" : "disconnected",
+  );
   const [driveMessage, setDriveMessage] = useState(
-    googleDriveConfigured
-      ? "Connect your account to sync the binder, print choices, and uploaded images."
+    restoreDriveOnLoad
+      ? "Restoring your Google Drive connection…"
+      : googleDriveConfigured
+      ? "Connect your account to load your Drive binder and start autosync."
       : "Set the Google client ID to enable Drive sync.",
   );
   const [driveAutosync, setDriveAutosync] = useState(false);
-  const skipNextAutosync = useRef(false);
   const driveSession = useRef(0);
+  const driveSyncInFlight = useRef(false);
+  const queuedDriveSync = useRef<DriveSyncPayload | null>(null);
+  const lastDriveSyncSignature = useRef<string | null>(null);
   const initialSourcesRefreshed = useRef(false);
+  const driveRestoreAttempted = useRef(false);
 
-  const entries = catalogues[0]?.entries ?? [];
+  const entries = useMemo(() => catalogues[0]?.entries ?? [], [catalogues]);
   const selectedTotal = entries.reduce((sum, entry) => sum + entry.quantity, 0);
   const previewEntry = entries.find((entry) => entry.id === previewId) ?? null;
 
@@ -115,9 +190,21 @@ function App() {
       const url = new URL(window.location.href);
       setPreviewId(url.searchParams.get(PREVIEW_QUERY_PARAM));
       setActiveModal(getModalFromUrl());
+      setSourceFilter(url.searchParams.get(SOURCE_QUERY_PARAM));
     };
     window.addEventListener("popstate", syncNavigationFromHistory);
     return () => window.removeEventListener("popstate", syncNavigationFromHistory);
+  }, []);
+
+  const changeSourceFilter = useCallback((sourceId: string | null) => {
+    const url = new URL(window.location.href);
+    if (sourceId) {
+      url.searchParams.set(SOURCE_QUERY_PARAM, sourceId);
+    } else {
+      url.searchParams.delete(SOURCE_QUERY_PARAM);
+    }
+    window.history.replaceState(window.history.state, "", url);
+    setSourceFilter(sourceId);
   }, []);
 
   const openCreaturePreview = useCallback((id: string) => {
@@ -260,15 +347,33 @@ function App() {
     const discovered = source.type === "html"
       ? await discoverSourceCreatures(source)
       : await discoverDriveFolderCreatures(driveAccessToken!, source);
+    const existingIds = new Set(
+      entries
+        .filter((entry) => entry.sourceId === source.id)
+        .map((entry) => entry.id),
+    );
+    const discoveredIds = new Set(discovered.map((entry) => entry.id));
+    const result: SourceRefreshResult = {
+      total: discovered.length,
+      added: discovered.filter((entry) => !existingIds.has(entry.id)).length,
+      removed: [...existingIds].filter((id) => !discoveredIds.has(id)).length,
+    };
     applySourceResults(source, discovered);
-    return discovered.length;
-  }, [applySourceResults, driveAccessToken]);
+    return result;
+  }, [applySourceResults, driveAccessToken, entries]);
 
   const refreshAllSources = useCallback(async () => {
     const results = await Promise.allSettled(sources.map(refreshSource));
     const successful = results.filter((result) => result.status === "fulfilled");
     const failed = results.filter((result) => result.status === "rejected");
-    const creatureCount = successful.reduce((sum, result) => sum + result.value, 0);
+    const summary = successful.reduce<SourceRefreshResult>(
+      (combined, result) => ({
+        total: combined.total + result.value.total,
+        added: combined.added + result.value.added,
+        removed: combined.removed + result.value.removed,
+      }),
+      { total: 0, added: 0, removed: 0 },
+    );
 
     if (failed.length > 0) {
       const firstError = failed[0].reason instanceof Error
@@ -279,7 +384,7 @@ function App() {
       );
     }
 
-    return creatureCount;
+    return summary;
   }, [refreshSource, sources]);
 
   const addSource = useCallback(async (draft: SourceDraft) => {
@@ -304,10 +409,10 @@ function App() {
     const discovered = source.type === "html"
       ? await discoverSourceCreatures(source)
       : await discoverDriveFolderCreatures(driveAccessToken!, source);
-    if (discovered.length === 0) {
-      throw new Error(source.type === "html"
-        ? "The selector did not find any links to supported image files."
-        : "That Drive folder does not contain any supported image files.");
+    if (source.type === "html" && discovered.length === 0) {
+      throw new Error(
+        "The selector did not find any links to supported image files.",
+      );
     }
     setSources((current) => [...current, source]);
     applySourceResults(source, discovered);
@@ -317,7 +422,8 @@ function App() {
   const removeSource = useCallback((source: CreatureSource) => {
     setSources((current) => current.filter((saved) => saved.id !== source.id));
     setEntries((current) => current.filter((entry) => entry.sourceId !== source.id));
-  }, [setEntries]);
+    if (sourceFilter === source.id) changeSourceFilter(null);
+  }, [changeSourceFilter, setEntries, sourceFilter]);
 
   const renameSource = useCallback((source: CreatureSource, name: string) => {
     setSources((current) => current.map((saved) =>
@@ -355,19 +461,49 @@ function App() {
     savePaperFormat(format);
   }, []);
 
+  const resolveDriveSourceEntries = useCallback(async (
+    entriesToResolve: MiniFigEntry[],
+  ): Promise<MiniFigEntry[]> => {
+    const needsDrive = entriesToResolve.some(
+      (entry) => entry.sourceId && entry.imageDriveFileId && !entry.imageDataUrl,
+    );
+    if (!needsDrive) return entriesToResolve;
+    if (!driveAccessToken) {
+      throw new Error("Connect Google Drive to load this creature for export.");
+    }
+    return loadDriveSourceImages(driveAccessToken, entriesToResolve);
+  }, [driveAccessToken]);
+
+  const resolvePreviewEntry = useCallback(async (
+    entry: MiniFigEntry,
+  ): Promise<MiniFigEntry> => {
+    const [resolved] = await resolveDriveSourceEntries([entry]);
+    return resolved;
+  }, [resolveDriveSourceEntries]);
+
   const applyDriveFileIds = useCallback((saved: Catalogue[]) => {
     const fileIds = new Map(
       saved.flatMap((catalogue) =>
         catalogue.entries.map((entry) => [entry.id, entry.imageDriveFileId] as const),
       ),
     );
-    setEntries((current) => current.map((entry) => {
-      const imageDriveFileId = fileIds.get(entry.id) ?? null;
-      return imageDriveFileId === entry.imageDriveFileId
-        ? entry
-        : { ...entry, imageDriveFileId };
-    }));
-  }, [setEntries]);
+    setCatalogues((current) => {
+      let changed = false;
+      const next = current.map((catalogue) => {
+        const entries = catalogue.entries.map((entry) => {
+          if (!fileIds.has(entry.id)) return entry;
+          const imageDriveFileId = fileIds.get(entry.id) ?? null;
+          if (imageDriveFileId === entry.imageDriveFileId) return entry;
+          changed = true;
+          return { ...entry, imageDriveFileId };
+        });
+        return entries.every((entry, index) => entry === catalogue.entries[index])
+          ? catalogue
+          : { ...catalogue, entries };
+      });
+      return changed ? next : current;
+    });
+  }, []);
 
   const handleDriveError = useCallback((error: unknown) => {
     const message = error instanceof Error ? error.message : "Google Drive sync failed.";
@@ -376,6 +512,7 @@ function App() {
     if (error instanceof DriveAuthError) {
       setDriveAccessToken(null);
       setDriveAutosync(false);
+      clearDriveSessionCredential();
     }
   }, []);
 
@@ -386,7 +523,7 @@ function App() {
       return;
     }
     if (!driveAccessToken || !driveAutosync) {
-      throw new Error("Connect Google Drive and load or save your binder before uploading images.");
+      throw new Error("Connect Google Drive before uploading images.");
     }
 
     const binder = catalogues[0] ?? createCatalogue("Creature Binder");
@@ -405,7 +542,11 @@ function App() {
         paperFormat,
         sources,
       );
-      skipNextAutosync.current = true;
+      lastDriveSyncSignature.current = createDriveSyncSignature(
+        saved.catalogues,
+        paperFormat,
+        sources,
+      );
       setCatalogues(normalizeAsBinder(saved.catalogues));
       setDriveStatus("synced");
       setDriveMessage("Creature uploaded. All changes saved to Drive.");
@@ -416,112 +557,269 @@ function App() {
     }
   }, [addEntry, catalogues, closeNavigationModal, driveAccessToken, driveAutosync, handleDriveError, paperFormat, sources]);
 
-  const handleConnectDrive = useCallback(async () => {
+  const connectAndSyncDrive = useCallback(async (
+    prompt: "" | "none",
+    restoring = false,
+    cachedAccessToken: string | null = null,
+  ) => {
+    const session = driveSession.current + 1;
+    driveSession.current = session;
     setDriveStatus("connecting");
-    setDriveMessage("Waiting for Google authorization…");
+    setDriveMessage(
+      restoring
+        ? "Restoring your Google Drive connection…"
+        : "Waiting for Google authorization…",
+    );
     try {
-      const accessToken = await connectGoogleDrive(googleClientId);
-      setDriveAccessToken(accessToken);
-      setDriveStatus("connected");
-      setDriveMessage("Connected. Load your binder or save this browser's binder.");
-      for (const source of sources.filter((candidate) => candidate.type === "drive")) {
-        void discoverDriveFolderCreatures(accessToken, source)
-          .then((discovered) => applySourceResults(source, discovered))
-          .catch(() => {
-            // The folder may need to be selected again if its Picker grant expired.
-          });
+      const syncAccessToken = async (accessToken: string) => {
+        if (session !== driveSession.current) return;
+
+        setDriveStatus("syncing");
+        setDriveMessage("Loading your binder from Drive…");
+        const remote = await loadCataloguesFromDrive(accessToken);
+        if (session !== driveSession.current) return;
+
+        let activeSources = sources;
+        if (remote) {
+          const remoteCatalogues = normalizeAsBinder(remote.catalogues);
+          const remotePaperFormat = remote.paperFormat ?? paperFormat;
+          lastDriveSyncSignature.current = createDriveSyncSignature(
+            remoteCatalogues,
+            remotePaperFormat,
+            remote.sources,
+          );
+          setCatalogues(remoteCatalogues);
+          setSources(remote.sources);
+          activeSources = remote.sources;
+          if (remote.paperFormat) handleSetPaperFormat(remote.paperFormat);
+          setDriveMessage("Binder loaded from Drive. Autosync is on.");
+        } else {
+          setDriveMessage("Creating your Drive binder…");
+          const saved = await saveCataloguesToDrive(
+            accessToken,
+            catalogues,
+            paperFormat,
+            sources,
+          );
+          if (session !== driveSession.current) return;
+          const savedCatalogues = normalizeAsBinder(saved.catalogues);
+          lastDriveSyncSignature.current = createDriveSyncSignature(
+            savedCatalogues,
+            paperFormat,
+            sources,
+          );
+          setCatalogues(savedCatalogues);
+          setDriveMessage("Drive binder created. Autosync is on.");
+        }
+
+        setDriveAccessToken(accessToken);
+        setDriveAutosync(true);
+        setDriveStatus("synced");
+        setDriveConnectionPreference(true);
+
+        for (const source of activeSources.filter((candidate) => candidate.type === "drive")) {
+          void discoverDriveFolderCreatures(accessToken, source)
+            .then((discovered) => applySourceResults(source, discovered))
+            .catch(() => {
+              // The folder may need to be selected again if its Picker grant expired.
+            });
+        }
+      };
+
+      let accessToken = cachedAccessToken;
+      if (!accessToken) {
+        const credential = await connectGoogleDrive(googleClientId, prompt);
+        accessToken = credential.accessToken;
+        setDriveSessionCredential(credential);
+      }
+
+      try {
+        await syncAccessToken(accessToken);
+      } catch (error) {
+        if (!cachedAccessToken || !(error instanceof DriveAuthError)) {
+          throw error;
+        }
+        clearDriveSessionCredential();
+        const credential = await connectGoogleDrive(googleClientId, prompt);
+        setDriveSessionCredential(credential);
+        await syncAccessToken(credential.accessToken);
       }
     } catch (error) {
-      handleDriveError(error);
+      if (session !== driveSession.current) return;
+      setDriveAccessToken(null);
+      setDriveAutosync(false);
+      if (error instanceof DriveAuthError) {
+        clearDriveSessionCredential();
+      }
+      if (restoring) {
+        setDriveStatus("disconnected");
+        setDriveMessage("Reconnect Google Drive to resume autosync.");
+      } else {
+        setDriveConnectionPreference(false);
+        handleDriveError(error);
+      }
     }
-  }, [applySourceResults, googleClientId, handleDriveError, sources]);
+  }, [
+    applySourceResults,
+    catalogues,
+    googleClientId,
+    handleDriveError,
+    handleSetPaperFormat,
+    paperFormat,
+    sources,
+  ]);
+
+  const handleConnectDrive = useCallback(() => {
+    void connectAndSyncDrive("", false);
+  }, [connectAndSyncDrive]);
+
+  useEffect(() => {
+    if (
+      driveRestoreAttempted.current ||
+      !restoreDriveOnLoad ||
+      !googleDriveConfigured
+    ) {
+      return;
+    }
+    driveRestoreAttempted.current = true;
+    void connectAndSyncDrive(
+      "none",
+      true,
+      initialDriveSession?.accessToken ?? null,
+    );
+  }, [
+    connectAndSyncDrive,
+    googleDriveConfigured,
+    initialDriveSession,
+    restoreDriveOnLoad,
+  ]);
 
   const handleDisconnectDrive = useCallback(() => {
     driveSession.current += 1;
+    queuedDriveSync.current = null;
+    lastDriveSyncSignature.current = null;
     setDriveAccessToken(null);
     setDriveAutosync(false);
     setDriveStatus("disconnected");
     setDriveMessage("Drive disconnected. Autosync is off until you reconnect.");
+    setDriveConnectionPreference(false);
+    clearDriveSessionCredential();
   }, []);
 
-  const handleLoadFromDrive = useCallback(async () => {
+  const handleDownloadDriveBackup = useCallback(async () => {
     if (!driveAccessToken) return;
     const session = driveSession.current;
     setDriveStatus("syncing");
-    setDriveMessage("Downloading binder and uploaded images…");
+    setDriveMessage("Preparing your Drive backup…");
     try {
-      const remote = await loadCataloguesFromDrive(driveAccessToken);
+      const backup = await downloadDriveBackup(driveAccessToken);
       if (session !== driveSession.current) return;
-      if (!remote) {
-        setDriveStatus("connected");
-        setDriveMessage("No Drive binder exists yet. Use Save to Drive to create one.");
-        return;
+      if (!backup) {
+        throw new Error("No Drive binder backup exists yet.");
       }
-      skipNextAutosync.current = true;
-      setCatalogues(normalizeAsBinder(remote.catalogues));
-      setSources(remote.sources);
-      if (remote.paperFormat) handleSetPaperFormat(remote.paperFormat);
-      setDriveAutosync(true);
-      setDriveStatus("synced");
-      setDriveMessage("Binder loaded. Future changes will sync automatically.");
-    } catch (error) {
-      if (session !== driveSession.current) return;
-      handleDriveError(error);
-    }
-  }, [driveAccessToken, handleDriveError, handleSetPaperFormat]);
 
-  const handleSaveToDrive = useCallback(async () => {
-    if (!driveAccessToken) return;
-    const session = driveSession.current;
-    setDriveStatus("syncing");
-    setDriveMessage("Uploading binder and new images…");
-    try {
-      const saved = await saveCataloguesToDrive(driveAccessToken, catalogues, paperFormat, sources);
-      if (session !== driveSession.current) return;
-      skipNextAutosync.current = !driveAutosync || hasNewDriveFileIds(catalogues, saved.catalogues);
-      applyDriveFileIds(saved.catalogues);
-      setDriveAutosync(true);
+      const url = URL.createObjectURL(backup);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `paper-mini-foundry-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+
       setDriveStatus("synced");
-      setDriveMessage("Binder saved. Future changes will sync automatically.");
+      setDriveMessage("Backup downloaded. Autosync is still on.");
     } catch (error) {
       if (session !== driveSession.current) return;
       handleDriveError(error);
     }
-  }, [applyDriveFileIds, catalogues, driveAccessToken, driveAutosync, handleDriveError, paperFormat, sources]);
+  }, [driveAccessToken, handleDriveError]);
+
+  const runQueuedDriveSync = useCallback(async () => {
+    if (driveSyncInFlight.current) return;
+    driveSyncInFlight.current = true;
+    try {
+      while (queuedDriveSync.current) {
+        const payload = queuedDriveSync.current;
+        queuedDriveSync.current = null;
+        if (
+          payload.session !== driveSession.current ||
+          payload.accessToken !== driveAccessToken ||
+          payload.signature === lastDriveSyncSignature.current
+        ) {
+          continue;
+        }
+
+        setDriveStatus("syncing");
+        setDriveMessage("Saving changes to Drive…");
+        try {
+          const saved = await saveCataloguesToDrive(
+            payload.accessToken,
+            payload.catalogues,
+            payload.paperFormat,
+            payload.sources,
+          );
+          if (
+            payload.session !== driveSession.current ||
+            payload.accessToken !== driveAccessToken
+          ) {
+            continue;
+          }
+          lastDriveSyncSignature.current = payload.signature;
+          applyDriveFileIds(saved.catalogues);
+          setDriveStatus("synced");
+          setDriveMessage(
+            queuedDriveSync.current
+              ? "Saving newer changes to Drive…"
+              : "All changes saved to Drive.",
+          );
+        } catch (error) {
+          if (payload.session === driveSession.current) {
+            queuedDriveSync.current = null;
+            handleDriveError(error);
+          }
+          break;
+        }
+      }
+    } finally {
+      driveSyncInFlight.current = false;
+    }
+  }, [applyDriveFileIds, driveAccessToken, handleDriveError]);
 
   useEffect(() => {
     if (!driveAutosync || !driveAccessToken) return;
-    if (skipNextAutosync.current) {
-      skipNextAutosync.current = false;
-      return;
-    }
+    const signature = createDriveSyncSignature(catalogues, paperFormat, sources);
+    if (signature === lastDriveSyncSignature.current) return;
 
-    setDriveStatus("syncing");
-    setDriveMessage("Saving changes to Drive…");
-    const timer = window.setTimeout(async () => {
-      const session = driveSession.current;
-      try {
-        const saved = await saveCataloguesToDrive(driveAccessToken, catalogues, paperFormat, sources);
-        if (session !== driveSession.current) return;
-        skipNextAutosync.current = hasNewDriveFileIds(catalogues, saved.catalogues);
-        applyDriveFileIds(saved.catalogues);
-        setDriveStatus("synced");
-        setDriveMessage("All changes saved to Drive.");
-      } catch (error) {
-        if (session !== driveSession.current) return;
-        handleDriveError(error);
-      }
-    }, 1000);
+    const timer = window.setTimeout(() => {
+      queuedDriveSync.current = {
+        accessToken: driveAccessToken,
+        catalogues,
+        paperFormat,
+        session: driveSession.current,
+        signature,
+        sources,
+      };
+      void runQueuedDriveSync();
+    }, DRIVE_AUTOSYNC_DELAY_MS);
 
     return () => window.clearTimeout(timer);
-  }, [applyDriveFileIds, catalogues, driveAccessToken, driveAutosync, handleDriveError, paperFormat, sources]);
+  }, [
+    catalogues,
+    driveAccessToken,
+    driveAutosync,
+    paperFormat,
+    runQueuedDriveSync,
+    sources,
+  ]);
 
   const handleGenerate = async () => {
-    const selected = entries.filter((entry) => entry.quantity > 0 && getEntryImageSource(entry));
+    const selected = entries.filter((entry) => entry.quantity > 0 && hasEntryImage(entry));
     setExportError("");
     setGenerating(true);
     try {
-      await generatePdf(selected, paperFormat, "paper-minis");
+      const resolved = await resolveDriveSourceEntries(selected);
+      await generatePdf(resolved, paperFormat, "paper-minis");
     } catch (error) {
       setExportError(
         error instanceof Error
@@ -536,11 +834,25 @@ function App() {
   const oversizedCount = entries.filter(
     (entry) =>
       entry.quantity > 0 &&
-      Boolean(getEntryImageSource(entry)) &&
+      hasEntryImage(entry) &&
       isEntryOversized(entry, paperFormat),
   ).length;
 
+  const driveSyncPanel = (
+    <GoogleDriveSync
+      configured={googleDriveConfigured}
+      connected={Boolean(driveAccessToken)}
+      status={driveStatus}
+      message={driveMessage}
+      autosyncEnabled={driveAutosync}
+      onConnect={handleConnectDrive}
+      onDisconnect={handleDisconnectDrive}
+      onDownloadBackup={handleDownloadDriveBackup}
+    />
+  );
+
   return (
+    <DriveImageProvider accessToken={driveAccessToken}>
     <div className="app">
       <header className="app-header">
         <div>
@@ -553,37 +865,50 @@ function App() {
             Binder <span>{entries.length}</span>
           </button>
           <button className={view === "print" ? "active" : ""} onClick={() => setView("print")}>
-            Print sheet <span>{selectedTotal}</span>
+            Print <span>{selectedTotal}</span>
+          </button>
+          <button
+            className={`settings-tab${view === "settings" ? " active" : ""}`}
+            onClick={() => setView("settings")}
+            aria-label="Settings"
+            title="Settings"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path
+                d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.74v.5a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"
+              />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
           </button>
         </nav>
       </header>
 
-      <GoogleDriveSync
-        configured={googleDriveConfigured}
-        connected={Boolean(driveAccessToken)}
-        status={driveStatus}
-        message={driveMessage}
-        autosyncEnabled={driveAutosync}
-        onConnect={handleConnectDrive}
-        onDisconnect={handleDisconnectDrive}
-        onLoad={handleLoadFromDrive}
-        onSave={handleSaveToDrive}
-      />
+      {view !== "settings" && !driveAccessToken && driveSyncPanel}
 
       {view === "binder" ? (
         <main className="binder-view">
           <CreatureBinder
             entries={entries}
             sources={sources}
+            sourceFilter={sourceFilter}
             onUpdate={updateEntry}
             onRemove={removeEntry}
             onAddCreature={() => openNavigationModal("add-creature")}
             onManageSources={() => openNavigationModal("sources")}
             onRefreshSources={refreshAllSources}
+            onSourceFilterChange={changeSourceFilter}
             onPreview={openCreaturePreview}
           />
         </main>
-      ) : (
+      ) : view === "print" ? (
         <main>
           {oversizedCount > 0 && (
             <div className="oversized-notice">
@@ -603,6 +928,15 @@ function App() {
             onPaperFormatChange={handleSetPaperFormat}
             onGenerate={handleGenerate}
           />
+        </main>
+      ) : (
+        <main className="settings-view">
+          <div className="settings-heading">
+            <span className="eyebrow">Application settings</span>
+            <h2>Settings</h2>
+            <p>Manage cloud storage, backups, and your Google Drive connection.</p>
+          </div>
+          {driveSyncPanel}
         </main>
       )}
 
@@ -624,7 +958,6 @@ function App() {
         <SourceDialog
           sources={sources}
           accessToken={driveAccessToken}
-          clientId={googleClientId}
           appId={googleAppId}
           developerKey={googleDeveloperKey}
           pickerConfigured={googlePickerConfigured}
@@ -651,10 +984,12 @@ function App() {
         <ExportPreviewDialog
           key={previewEntry.id}
           entry={previewEntry}
+          resolveEntry={resolvePreviewEntry}
           onClose={closeCreaturePreview}
         />
       )}
     </div>
+    </DriveImageProvider>
   );
 }
 

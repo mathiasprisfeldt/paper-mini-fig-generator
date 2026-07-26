@@ -5,17 +5,21 @@ import { AppModal } from "./AppModal";
 
 interface Props {
   entry: MiniFigEntry;
+  resolveEntry: (entry: MiniFigEntry) => Promise<MiniFigEntry>;
   onClose: () => void;
 }
 
-export function ExportPreviewDialog({ entry, onClose }: Props) {
+export function ExportPreviewDialog({ entry, resolveEntry, onClose }: Props) {
   const [previewUrl, setPreviewUrl] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
 
-    void renderPreview(entry, entry.quantity > 1 ? 1 : null)
+    void resolveEntry(entry)
+      .then((resolvedEntry) =>
+        renderPreview(resolvedEntry, entry.quantity > 1 ? 1 : null),
+      )
       .then((url) => {
         if (!active) return;
         if (url) setPreviewUrl(url);
@@ -30,7 +34,7 @@ export function ExportPreviewDialog({ entry, onClose }: Props) {
       });
 
     return () => { active = false; };
-  }, [entry]);
+  }, [entry, resolveEntry]);
 
   return (
     <AppModal

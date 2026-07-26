@@ -291,25 +291,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@googleworkspace/drive-picker-element@npm:0.7.3":
-  version: 0.7.3
-  resolution: "@googleworkspace/drive-picker-element@npm:0.7.3"
-  checksum: 10c0/62498805e0f315ba2f1c27cc5bb7959e19e98c770fd9c9c01f57f47c8d45705aa717ac266406b31fe90280a057628dc33f7253ce493f841f9793895f37c7e7a1
-  languageName: node
-  linkType: hard
-
-"@googleworkspace/drive-picker-react@npm:^0.2.0":
-  version: 0.2.0
-  resolution: "@googleworkspace/drive-picker-react@npm:0.2.0"
-  dependencies:
-    "@googleworkspace/drive-picker-element": "npm:0.7.3"
-  peerDependencies:
-    react: ">=16.8.0"
-    react-dom: ">=16.8.0"
-  checksum: 10c0/7bb350299a600ec96e37a29040c82dc3606d3c5fb323ed9053ff1269aebc54c420189a8eebc410970ae10a7524b7cc9d358c3065f606fd4531bd5302741797f6
-  languageName: node
-  linkType: hard
-
 "@humanfs/core@npm:^0.19.2":
   version: 0.19.2
   resolution: "@humanfs/core@npm:0.19.2"
@@ -1713,7 +1694,6 @@ __metadata:
   resolution: "paper-mini-fig-generator@workspace:."
   dependencies:
     "@eslint/js": "npm:^10.0.1"
-    "@googleworkspace/drive-picker-react": "npm:^0.2.0"
     "@types/node": "npm:^24.12.2"
     "@types/react": "npm:^19.2.14"
     "@types/react-dom": "npm:^19.2.3"

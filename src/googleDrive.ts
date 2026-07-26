@@ -8,19 +8,23 @@ import type {
 import type { DiscoveredCreature } from "./sourceDiscovery";
 import { migrateMiniFigEntry } from "./storage";
 
-const DRIVE_SCOPE = [
+const DRIVE_SCOPES = [
   "https://www.googleapis.com/auth/drive.appdata",
-  "https://www.googleapis.com/auth/drive.file",
-].join(" ");
+  "https://www.googleapis.com/auth/drive.readonly",
+] as const;
+const DRIVE_SCOPE = DRIVE_SCOPES.join(" ");
 const MANIFEST_NAME = "paper-mini-fig-catalogues.json";
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
 const DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive/v3";
 const GIS_SCRIPT_URL = "https://accounts.google.com/gsi/client";
+const GOOGLE_API_SCRIPT_URL = "https://apis.google.com/js/api.js";
 const DRIVE_DOWNLOAD_CONCURRENCY = 6;
 const DRIVE_SOURCE_IMAGE_LIMIT = 200;
 
 interface GoogleTokenResponse {
   access_token?: string;
+  expires_in?: number;
+  scope?: string;
   error?: string;
   error_description?: string;
 }
@@ -32,18 +36,72 @@ interface GoogleTokenClient {
 interface GoogleOAuthApi {
   initTokenClient: (config: {
     client_id: string;
+    include_granted_scopes?: boolean;
     scope: string;
     callback: (response: GoogleTokenResponse) => void;
     error_callback?: (error: { type?: string }) => void;
   }) => GoogleTokenClient;
 }
 
+interface GooglePickerDocument {
+  id?: string;
+  name?: string;
+}
+
+interface GooglePickerResponse {
+  action?: string;
+  docs?: GooglePickerDocument[];
+}
+
+interface GooglePickerView {
+  setIncludeFolders: (enabled: boolean) => GooglePickerView;
+  setOwnedByMe: (enabled: boolean) => GooglePickerView;
+  setSelectFolderEnabled: (enabled: boolean) => GooglePickerView;
+}
+
+interface GooglePickerDialog {
+  setVisible: (visible: boolean) => void;
+}
+
+interface GooglePickerBuilder {
+  addView: (view: GooglePickerView) => GooglePickerBuilder;
+  build: () => GooglePickerDialog;
+  setAppId: (appId: string) => GooglePickerBuilder;
+  setCallback: (
+    callback: (response: GooglePickerResponse) => void,
+  ) => GooglePickerBuilder;
+  setDeveloperKey: (developerKey: string) => GooglePickerBuilder;
+  setMaxItems: (maxItems: number) => GooglePickerBuilder;
+  setOAuthToken: (accessToken: string) => GooglePickerBuilder;
+  setOrigin: (origin: string) => GooglePickerBuilder;
+  setTitle: (title: string) => GooglePickerBuilder;
+}
+
+interface GooglePickerApi {
+  Action: {
+    CANCEL: string;
+    ERROR: string;
+    PICKED: string;
+  };
+  DocsView: new (viewId: unknown) => GooglePickerView;
+  PickerBuilder: new () => GooglePickerBuilder;
+  ViewId: {
+    FOLDERS: unknown;
+  };
+}
+
+interface GoogleApiLoader {
+  load: (api: string, callback: () => void) => void;
+}
+
 declare global {
   interface Window {
+    gapi?: GoogleApiLoader;
     google?: {
       accounts: {
         oauth2: GoogleOAuthApi;
       };
+      picker?: GooglePickerApi;
     };
   }
 }
@@ -107,7 +165,14 @@ function normalizeSource(value: unknown): CreatureSource | null {
 
 export class DriveAuthError extends Error {}
 
+export interface GoogleDriveAccessToken {
+  accessToken: string;
+  expiresAt: number;
+  scopes: string[];
+}
+
 let googleIdentityServicesPromise: Promise<void> | null = null;
+let googlePickerApiPromise: Promise<void> | null = null;
 
 function loadGoogleIdentityServices(): Promise<void> {
   if (window.google?.accounts.oauth2) return Promise.resolve();
@@ -144,7 +209,130 @@ function loadGoogleIdentityServices(): Promise<void> {
   return loadingPromise;
 }
 
-export async function connectGoogleDrive(clientId: string): Promise<string> {
+function loadGooglePickerApi(): Promise<void> {
+  if (window.google?.picker) return Promise.resolve();
+  if (googlePickerApiPromise) return googlePickerApiPromise;
+
+  const loadingPromise = new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      if (error) reject(error);
+      else resolve();
+    };
+    const loadPicker = () => {
+      if (!window.gapi) {
+        finish(new Error("Google Picker did not initialize."));
+        return;
+      }
+      window.gapi.load("client:picker", () => {
+        if (window.google?.picker) {
+          finish();
+        } else {
+          finish(new Error("Google Picker did not initialize."));
+        }
+      });
+    };
+    const timeout = window.setTimeout(
+      () => finish(new Error("Google Picker took too long to load.")),
+      10_000,
+    );
+
+    if (window.gapi) {
+      loadPicker();
+      return;
+    }
+
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[src="${GOOGLE_API_SCRIPT_URL}"]`,
+    );
+    const script = document.createElement("script");
+    script.src = GOOGLE_API_SCRIPT_URL;
+    script.async = true;
+    script.defer = true;
+    if (existing?.nonce) script.nonce = existing.nonce;
+    script.addEventListener("load", loadPicker, { once: true });
+    script.addEventListener(
+      "error",
+      () => finish(new Error("Could not load Google Picker.")),
+      { once: true },
+    );
+    document.head.appendChild(script);
+  }).catch((error) => {
+    googlePickerApiPromise = null;
+    throw error;
+  });
+  googlePickerApiPromise = loadingPromise;
+  return loadingPromise;
+}
+
+export interface PickedDriveFolder {
+  id: string;
+  name: string;
+}
+
+interface DriveFolderPickerOptions {
+  accessToken: string;
+  appId: string;
+  developerKey: string;
+  origin: string;
+}
+
+export async function openDriveFolderPicker({
+  accessToken,
+  appId,
+  developerKey,
+  origin,
+}: DriveFolderPickerOptions): Promise<PickedDriveFolder | null> {
+  if (!appId || !developerKey) {
+    throw new Error("Google Picker is not configured for this deployment.");
+  }
+  await loadGooglePickerApi();
+  const pickerApi = window.google?.picker;
+  if (!pickerApi) throw new Error("Google Picker did not initialize.");
+
+  return new Promise((resolve, reject) => {
+    const view = new pickerApi.DocsView(pickerApi.ViewId.FOLDERS)
+      .setIncludeFolders(true)
+      .setOwnedByMe(true)
+      .setSelectFolderEnabled(true);
+
+    const picker = new pickerApi.PickerBuilder()
+      .setAppId(appId)
+      .setDeveloperKey(developerKey)
+      .setOAuthToken(accessToken)
+      .setOrigin(origin)
+      .setTitle("Choose a creature image folder")
+      .setMaxItems(1)
+      .addView(view)
+      .setCallback((response) => {
+        if (response.action === pickerApi.Action.CANCEL) {
+          resolve(null);
+          return;
+        }
+        if (response.action === pickerApi.Action.ERROR) {
+          reject(new Error("Google Picker could not open this Drive folder."));
+          return;
+        }
+        if (response.action !== pickerApi.Action.PICKED) return;
+        const folder = response.docs?.[0];
+        if (!folder?.id || !folder.name) {
+          reject(new Error("Google Drive did not return a folder."));
+          return;
+        }
+        resolve({ id: folder.id, name: folder.name });
+      })
+      .build();
+    picker.setVisible(true);
+  });
+}
+
+export async function connectGoogleDrive(
+  clientId: string,
+  prompt = "",
+): Promise<GoogleDriveAccessToken> {
   if (!clientId) {
     throw new Error("Google Drive is not configured for this deployment.");
   }
@@ -160,6 +348,7 @@ export async function connectGoogleDrive(clientId: string): Promise<string> {
 
     const client = oauth2.initTokenClient({
       client_id: clientId,
+      include_granted_scopes: true,
       scope: DRIVE_SCOPE,
       callback: (response) => {
         if (response.error || !response.access_token) {
@@ -170,14 +359,36 @@ export async function connectGoogleDrive(clientId: string): Promise<string> {
           );
           return;
         }
-        resolve(response.access_token);
+        const scopes = response.scope?.split(/\s+/).filter(Boolean) ?? [];
+        const missingScopes = DRIVE_SCOPES.filter(
+          (requiredScope) => !scopes.includes(requiredScope),
+        );
+        if (missingScopes.length > 0) {
+          reject(
+            new DriveAuthError(
+              "Google Drive folder access was not granted. Reconnect and allow both app data and read-only Drive access.",
+            ),
+          );
+          return;
+        }
+        const expiresInSeconds =
+          typeof response.expires_in === "number" &&
+          Number.isFinite(response.expires_in) &&
+          response.expires_in > 0
+            ? response.expires_in
+            : 3600;
+        resolve({
+          accessToken: response.access_token,
+          expiresAt: Date.now() + expiresInSeconds * 1000,
+          scopes,
+        });
       },
       error_callback: () => {
         reject(new DriveAuthError("Google Drive connection was cancelled."));
       },
     });
 
-    client.requestAccessToken({ prompt: "" });
+    client.requestAccessToken({ prompt });
   });
 }
 
@@ -224,6 +435,14 @@ async function findAppDataFile(
   );
   const result = (await response.json()) as DriveFileList;
   return result.files?.[0] ?? null;
+}
+
+export async function downloadDriveBackup(
+  accessToken: string,
+): Promise<Blob | null> {
+  const file = await findAppDataFile(accessToken, MANIFEST_NAME);
+  if (!file) return null;
+  return downloadFile(accessToken, file.id);
 }
 
 async function listAppDataFiles(accessToken: string): Promise<DriveFile[]> {
@@ -306,6 +525,13 @@ async function downloadFile(
   return response.blob();
 }
 
+export function downloadDriveImageBlob(
+  accessToken: string,
+  fileId: string,
+): Promise<Blob> {
+  return downloadFile(accessToken, fileId);
+}
+
 async function deleteFile(accessToken: string, fileId: string): Promise<void> {
   const params = new URLSearchParams({ supportsAllDrives: "true" });
   await driveFetch(
@@ -380,32 +606,35 @@ export async function discoverDriveFolderCreatures(
       (files.length === DRIVE_SOURCE_IMAGE_LIMIT && result.nextPageToken)
     ) {
       throw new Error(
-        `This Drive folder contains more than ${DRIVE_SOURCE_IMAGE_LIMIT} images. Choose a smaller folder to keep browser memory use manageable.`,
+        `This Drive folder contains more than ${DRIVE_SOURCE_IMAGE_LIMIT} images. Choose a smaller folder to keep the binder manageable.`,
       );
     }
     pageToken = result.nextPageToken;
   } while (pageToken);
 
-  const discovered = await mapWithConcurrency(
-    files,
+  return files.map((file) => ({
+    id: `source-${source.id}-${file.id}`,
+    name: file.name.replace(/\.[^.]+$/, ""),
+    imageDataUrl: null,
+    imageUrl: null,
+    imageDriveFileId: file.id,
+  }));
+}
+
+export async function loadDriveSourceImages(
+  accessToken: string,
+  entries: MiniFigEntry[],
+): Promise<MiniFigEntry[]> {
+  return mapWithConcurrency(
+    entries,
     DRIVE_DOWNLOAD_CONCURRENCY,
-    async (file): Promise<DiscoveredCreature | null> => {
-      try {
-        return {
-          id: `source-${source.id}-${file.id}`,
-          name: file.name.replace(/\.[^.]+$/, ""),
-          imageDataUrl: await blobToDataUrl(await downloadFile(accessToken, file.id)),
-          imageUrl: null,
-          imageDriveFileId: file.id,
-        };
-      } catch (error) {
-        if (error instanceof DriveAuthError) throw error;
-        return null;
+    async (entry) => {
+      if (!entry.sourceId || !entry.imageDriveFileId || entry.imageDataUrl) {
+        return entry;
       }
+      const blob = await downloadFile(accessToken, entry.imageDriveFileId);
+      return { ...entry, imageDataUrl: await blobToDataUrl(blob) };
     },
-  );
-  return discovered.filter(
-    (creature): creature is DiscoveredCreature => creature !== null,
   );
 }
 
@@ -523,6 +752,7 @@ async function hydrateEntryImage(
   entry: MiniFigEntry,
 ): Promise<MiniFigEntry> {
   if (entry.imageUrl) return { ...entry, imageDataUrl: null };
+  if (entry.sourceId) return { ...entry, imageDataUrl: null };
   if (!entry.imageDriveFileId) return { ...entry, imageDataUrl: null };
   try {
     const blob = await downloadFile(accessToken, entry.imageDriveFileId);

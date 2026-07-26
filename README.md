@@ -48,7 +48,8 @@ Drive's hidden `appDataFolder`. Linked images remain external URLs in the
 manifest, so they do not consume additional Drive storage. Only this app can
 access the hidden files, and they do not appear in the user's regular Drive
 folders. The app requests `drive.appdata` for its hidden storage and
-`drive.file` for folders the user explicitly selects through Google Picker.
+`drive.readonly` so it can discover and render images in a folder the user
+chooses through Google Picker. The app only queries saved source folders.
 
 1. Create or select a project in the
    [Google Cloud console](https://console.cloud.google.com/).
@@ -56,10 +57,13 @@ folders. The app requests `drive.appdata` for its hidden storage and
    Drive-folder sources should be available.
 3. Configure the OAuth consent screen and add the
    `https://www.googleapis.com/auth/drive.appdata` and
-   `https://www.googleapis.com/auth/drive.file` scopes. The latter is narrow,
-   per-file access for folders the user explicitly selects through Picker. If
-   the app is in testing mode, add the Google accounts that should be able to
-   use it as test users.
+   `https://www.googleapis.com/auth/drive.readonly` scopes. Read-only Drive
+   access is required because selecting a folder through Picker does not grant
+   `drive.file` access to its existing or newly added children. The application
+   still limits its Drive queries to folders the user saves as sources. If the
+   app is in testing mode, add the Google accounts that should be able to use it
+   as test users. Google classifies `drive.readonly` as a restricted scope, so a
+   public production app must complete the applicable OAuth verification.
 4. Create an OAuth 2.0 Client ID with application type **Web application**.
 5. Add the development and production origins under **Authorized JavaScript
    origins**:
@@ -84,9 +88,9 @@ For GitHub Pages, create Actions repository secrets named `GOOGLE_CLIENT_ID`,
 be treated as public browser configuration; the OAuth web client does not use a
 client secret.
 
-Drive access tokens are kept in memory and expire after a short period. The app
-asks the user to reconnect when needed. After an explicit **Load from Drive** or
-**Save to Drive**, changes autosync for the rest of the session.
+Drive access tokens are kept in session storage and expire after a short period.
+The app restores a valid session when possible and asks the user to reconnect
+when needed. Binder changes autosync after Drive is connected.
 
 The hidden app-data folder counts against the user's Drive storage. Its contents
 cannot be browsed, moved, shared, or deleted individually in the normal Drive UI;
@@ -122,8 +126,9 @@ through Drive, and users can refresh or remove sources from the binder.
 
 A source can alternatively be a Google Drive folder. The official Google Picker
 lets the user choose one folder; image files directly inside it become binder
-creatures. This uses narrow `drive.file` access rather than access to the user's
-entire Drive. The user must be connected to Drive to add or refresh this source.
+creatures. The app uses read-only Drive access to discover both existing files
+and files added after the folder was selected. The user must be connected to
+Drive to add or refresh this source.
 
 ### Build
 
@@ -137,4 +142,4 @@ yarn build
 - TypeScript
 - Vite
 - jsPDF for PDF generation
-- Official `@googleworkspace/drive-picker-react` folder picker
+- Google Picker API for folder selection

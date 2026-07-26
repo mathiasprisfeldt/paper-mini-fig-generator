@@ -1,4 +1,5 @@
 import { getEntryImageSource } from "../generatePdf";
+import { DriveCreatureImage } from "../driveImages";
 import type { MiniFigEntry } from "../types";
 
 interface Props {
@@ -16,7 +17,7 @@ export function CreatureThumbnail({
   showHint = true,
   onPreview,
 }: Props) {
-  const imageSource = getEntryImageSource(entry);
+  const hasImage = Boolean(getEntryImageSource(entry) || entry.imageDriveFileId);
 
   return (
     <button
@@ -25,17 +26,17 @@ export function CreatureThumbnail({
       onClick={() => onPreview(entry.id)}
       aria-label={`Preview ${entry.name || "creature"} export`}
     >
-      {imageSource ? (
+      {hasImage ? (
         <>
-          <img
+          <DriveCreatureImage
+            entry={entry}
             className="creature-art-backdrop"
-            src={imageSource}
             alt=""
             aria-hidden="true"
           />
-          <img
+          <DriveCreatureImage
+            entry={entry}
             className="creature-art-foreground"
-            src={imageSource}
             alt=""
           />
         </>

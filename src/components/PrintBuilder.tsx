@@ -42,11 +42,6 @@ export function PrintBuilder({
     <div className="print-layout">
       <section className="print-picker">
         <div className="section-toolbar">
-          <div>
-            <span className="eyebrow">Print selection</span>
-            <h2>Choose your creatures</h2>
-            <p>Set zero to leave a creature out of this print.</p>
-          </div>
           <div className="print-toolbar-actions">
             <input
               className="search-input print-search-input"
@@ -132,7 +127,7 @@ export function PrintBuilder({
 
       <aside className="print-summary">
         <span className="eyebrow">Export</span>
-        <h2>Print sheet</h2>
+        <h2>Print</h2>
         <div className="summary-stat">
           <strong>{total}</strong>
           <span>miniature{total === 1 ? "" : "s"}</span>

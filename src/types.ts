@@ -43,6 +43,12 @@ export interface DriveCreatureSource extends CreatureSourceBase {
 
 export type CreatureSource = HtmlCreatureSource | DriveCreatureSource;
 
+export interface SourceRefreshResult {
+  total: number;
+  added: number;
+  removed: number;
+}
+
 export interface Catalogue {
   id: string;
   name: string;

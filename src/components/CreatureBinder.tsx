@@ -1,52 +1,97 @@
 import { useMemo, useState } from "react";
-import type { CreatureSize, CreatureSource, MiniFigEntry, MiniSize } from "../types";
+import type {
+  CreatureSize,
+  CreatureSource,
+  MiniFigEntry,
+  MiniSize,
+  SourceRefreshResult,
+} from "../types";
+import { useToast } from "../toastContext";
 import { CreatureThumbnail } from "./CreatureThumbnail";
 
 interface Props {
   entries: MiniFigEntry[];
   sources: CreatureSource[];
+  sourceFilter: string | null;
   onUpdate: (id: string, patch: Partial<MiniFigEntry>) => void;
   onRemove: (id: string) => void;
   onPreview: (id: string) => void;
   onAddCreature: () => void;
   onManageSources: () => void;
-  onRefreshSources: () => Promise<number>;
+  onRefreshSources: () => Promise<SourceRefreshResult>;
+  onSourceFilterChange: (sourceId: string | null) => void;
 }
 
 const CREATURE_SIZES: CreatureSize[] = [
   "tiny", "small", "medium", "large", "huge", "gargantuan",
 ];
 const MINI_SIZES: MiniSize[] = [24, 28, 32];
+const ALL_SOURCES = "";
+const MANUAL_SOURCE = "manual";
 
 export function CreatureBinder({
   entries,
   sources,
+  sourceFilter,
   onUpdate,
   onRemove,
   onPreview,
   onAddCreature,
   onManageSources,
   onRefreshSources,
+  onSourceFilterChange,
 }: Props) {
+  const { showToast } = useToast();
   const [query, setQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  const [refreshMessage, setRefreshMessage] = useState("");
+  const sourceCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const entry of entries) {
+      const key = entry.sourceId ?? MANUAL_SOURCE;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
+  }, [entries]);
+
+  const activeSourceFilter =
+    !sourceFilter ||
+    sourceFilter === MANUAL_SOURCE ||
+    sources.some((source) => source.id === sourceFilter)
+      ? sourceFilter ?? ALL_SOURCES
+      : ALL_SOURCES;
+
   const visibleEntries = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return [...entries]
-      .filter((entry) => !normalized || entry.name.toLowerCase().includes(normalized))
+      .filter((entry) => {
+        const matchesQuery =
+          !normalized || entry.name.toLowerCase().includes(normalized);
+        const matchesSource =
+          activeSourceFilter === ALL_SOURCES ||
+          (activeSourceFilter === MANUAL_SOURCE
+            ? !entry.sourceId
+            : entry.sourceId === activeSourceFilter);
+        return matchesQuery && matchesSource;
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [entries, query]);
+  }, [activeSourceFilter, entries, query]);
   const refreshAllSources = async () => {
     setRefreshing(true);
-    setRefreshMessage("");
     try {
-      const creatureCount = await onRefreshSources();
-      setRefreshMessage(
-        `Refreshed ${sources.length} source${sources.length === 1 ? "" : "s"} · ${creatureCount} creature${creatureCount === 1 ? "" : "s"}`,
-      );
+      const result = await onRefreshSources();
+      showToast({
+        tone: "success",
+        title: `Refreshed ${sources.length} source${sources.length === 1 ? "" : "s"}`,
+        message: `${result.added} added · ${result.removed} removed · ${result.total} total`,
+      });
     } catch (caught) {
-      setRefreshMessage(caught instanceof Error ? caught.message : "The sources could not be refreshed.");
+      showToast({
+        tone: "error",
+        title: "Source refresh failed",
+        message: caught instanceof Error
+          ? caught.message
+          : "The sources could not be refreshed.",
+      });
     } finally {
       setRefreshing(false);
     }
@@ -56,11 +101,6 @@ export function CreatureBinder({
     <>
     <section className="binder-section">
       <div className="section-toolbar">
-        <div>
-          <span className="eyebrow">Creature library</span>
-          <h2>Your binder</h2>
-          <p>{entries.length} creature{entries.length === 1 ? "" : "s"} ready to reuse.</p>
-        </div>
         <div className="binder-toolbar-actions">
           <input
             className="search-input"
@@ -70,6 +110,24 @@ export function CreatureBinder({
             placeholder="Search creatures…"
             aria-label="Search creatures"
           />
+          <select
+            className="source-filter"
+            value={activeSourceFilter}
+            onChange={(event) =>
+              onSourceFilterChange(event.target.value || null)
+            }
+            aria-label="Filter creatures by source"
+          >
+            <option value={ALL_SOURCES}>All creatures ({entries.length})</option>
+            <option value={MANUAL_SOURCE}>
+              Manually added ({sourceCounts.get(MANUAL_SOURCE) ?? 0})
+            </option>
+            {sources.map((source) => (
+              <option value={source.id} key={source.id}>
+                {source.name} ({sourceCounts.get(source.id) ?? 0})
+              </option>
+            ))}
+          </select>
           <div className="source-button-group">
             <button className="btn btn-secondary" onClick={onManageSources}>Sources</button>
             <button
@@ -86,10 +144,6 @@ export function CreatureBinder({
           <button className="btn btn-primary" onClick={onAddCreature}>+ Add creature</button>
         </div>
       </div>
-
-      {refreshMessage && (
-        <p className="source-refresh-message" role="status">{refreshMessage}</p>
-      )}
 
       {visibleEntries.length > 0 ? (
         <div className="creature-grid">
@@ -154,7 +208,7 @@ export function CreatureBinder({
         <div className="empty-state">
           <span>◇</span>
           <h3>{entries.length ? "No matching creatures" : "Your binder is empty"}</h3>
-          <p>{entries.length ? "Try another search." : "Add a creature manually or connect an HTML source."}</p>
+          <p>{entries.length ? "Try another search or source filter." : "Add a creature manually or connect an HTML source."}</p>
         </div>
       )}
     </section>

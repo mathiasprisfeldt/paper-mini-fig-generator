@@ -1,13 +1,12 @@
 import { useState } from "react";
-import {
-  DrivePicker,
-  DrivePickerDocsView,
-} from "@googleworkspace/drive-picker-react";
+import { openDriveFolderPicker } from "../googleDrive";
 import type {
   CreatureSource,
   DriveCreatureSource,
   HtmlCreatureSource,
+  SourceRefreshResult,
 } from "../types";
+import { useToast } from "../toastContext";
 import { SourceAccessError } from "../sourceDiscovery";
 import { AppModal } from "./AppModal";
 
@@ -18,25 +17,19 @@ export type SourceDraft =
 interface Props {
   sources: CreatureSource[];
   accessToken: string | null;
-  clientId: string;
   appId: string;
   developerKey: string;
   pickerConfigured: boolean;
   onAdd: (draft: SourceDraft) => Promise<number>;
-  onRefresh: (source: CreatureSource) => Promise<number>;
+  onRefresh: (source: CreatureSource) => Promise<SourceRefreshResult>;
   onRename: (source: CreatureSource, name: string) => void;
   onRemove: (source: CreatureSource) => void;
   onClose: () => void;
 }
 
-interface FolderPickerEventDetail {
-  docs?: Array<{ id?: string; name?: string }>;
-}
-
 export function SourceDialog({
   sources,
   accessToken,
-  clientId,
   appId,
   developerKey,
   pickerConfigured,
@@ -46,11 +39,11 @@ export function SourceDialog({
   onRemove,
   onClose,
 }: Props) {
+  const { showToast } = useToast();
   const [sourceType, setSourceType] = useState<"html" | "drive">("html");
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [selector, setSelector] = useState("");
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [busySourceId, setBusySourceId] = useState<string | null>(null);
   const [renamingSourceId, setRenamingSourceId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -96,24 +89,26 @@ export function SourceDialog({
     }
   };
 
-  const handleFolderPicked = async (event: CustomEvent<FolderPickerEventDetail>) => {
-    const folder = event.detail.docs?.[0];
-    setPickerOpen(false);
+  const handleChooseDriveFolder = async () => {
     resetFeedback();
-    if (!folder?.id || !folder.name) {
-      setError("Google Drive did not return a folder.");
-      return;
-    }
-
     setBusySourceId("new");
     try {
+      const folder = await openDriveFolderPicker({
+        accessToken: accessToken!,
+        appId,
+        developerKey,
+        origin: window.location.origin,
+      });
+      if (!folder) return;
       const count = await onAdd({
         type: "drive",
         name: name.trim() || folder.name,
         folderId: folder.id,
         folderName: folder.name,
       });
-      setMessage(`Drive folder added with ${count} creature${count === 1 ? "" : "s"}.`);
+      setMessage(count === 0
+        ? "Drive folder added. It is empty; refresh the source after adding images."
+        : `Drive folder added with ${count} creature${count === 1 ? "" : "s"}.`);
       setName("");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not read the Drive folder.");
@@ -126,11 +121,23 @@ export function SourceDialog({
     setBusySourceId(source.id);
     resetFeedback();
     try {
-      const count = await onRefresh(source);
-      setMessage(`Refreshed ${source.name}: ${count} creature${count === 1 ? "" : "s"}.`);
+      const result = await onRefresh(source);
+      showToast({
+        tone: "success",
+        title: `Refreshed ${source.name}`,
+        message: `${result.added} added · ${result.removed} removed · ${result.total} total`,
+      });
     } catch (caught) {
       setShowCorsHelp(caught instanceof SourceAccessError);
-      setError(caught instanceof Error ? caught.message : "Could not refresh the source.");
+      const errorMessage = caught instanceof Error
+        ? caught.message
+        : "Could not refresh the source.";
+      setError(errorMessage);
+      showToast({
+        tone: "error",
+        title: `Could not refresh ${source.name}`,
+        message: errorMessage,
+      });
     } finally {
       setBusySourceId(null);
     }
@@ -230,8 +237,8 @@ export function SourceDialog({
                 Drive folder sources require the Google Picker app ID and API key in this deployment.
               </p>
             ) : (
-              <button className="btn btn-primary" onClick={() => setPickerOpen(true)} disabled={busySourceId !== null}>
-                Choose Drive folder
+              <button className="btn btn-primary" onClick={handleChooseDriveFolder} disabled={busySourceId !== null}>
+                {busySourceId === "new" ? "Opening Drive…" : "Choose Drive folder"}
               </button>
             )}
           </div>
@@ -293,32 +300,6 @@ export function SourceDialog({
               </article>
             ))}
           </div>
-        )}
-
-        {pickerOpen && accessToken && (
-          <DrivePicker
-            client-id={clientId}
-            app-id={appId}
-            developer-key={developerKey}
-            oauth-token={accessToken}
-            origin={window.location.origin}
-            title="Choose a creature image folder"
-            max-items={1}
-            onPicked={handleFolderPicked}
-            onCanceled={() => setPickerOpen(false)}
-            onOauthError={() => {
-              setPickerOpen(false);
-              setError("Google Drive authorization failed. Reconnect and try again.");
-            }}
-          >
-            <DrivePickerDocsView
-              view-id="FOLDERS"
-              include-folders="true"
-              select-folder-enabled="true"
-              owned-by-me="true"
-              mode="LIST"
-            />
-          </DrivePicker>
         )}
     </AppModal>
   );

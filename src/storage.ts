@@ -11,6 +11,10 @@ const CATALOGUES_KEY = "paper-mini-fig-catalogues";
 const ACTIVE_CATALOGUE_KEY = "paper-mini-fig-active-catalogue";
 const PAPER_FORMAT_KEY = "paper-mini-fig-paper-format";
 const SOURCES_KEY = "paper-mini-fig-sources";
+const DRIVE_CONNECTION_KEY = "paper-mini-fig-drive-connected";
+const DRIVE_SESSION_KEY = "paper-mini-fig-drive-session";
+const DRIVE_SESSION_VERSION = 2;
+const DRIVE_SESSION_EXPIRY_BUFFER_MS = 30_000;
 
 const VALID_MINI_SIZES: MiniSize[] = [24, 28, 32];
 const VALID_CREATURE_SIZES: CreatureSize[] = [
@@ -166,4 +170,76 @@ export function loadSources(): CreatureSource[] {
 
 export function saveSources(sources: CreatureSource[]): void {
   localStorage.setItem(SOURCES_KEY, JSON.stringify(sources));
+}
+
+export function getDriveConnectionPreference(): boolean {
+  try {
+    return localStorage.getItem(DRIVE_CONNECTION_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function setDriveConnectionPreference(connected: boolean): void {
+  if (connected) {
+    localStorage.setItem(DRIVE_CONNECTION_KEY, "true");
+  } else {
+    localStorage.removeItem(DRIVE_CONNECTION_KEY);
+  }
+}
+
+export interface DriveSessionCredential {
+  accessToken: string;
+  expiresAt: number;
+  scopes: string[];
+}
+
+export function getDriveSessionCredential(): DriveSessionCredential | null {
+  try {
+    const raw = sessionStorage.getItem(DRIVE_SESSION_KEY);
+    if (!raw) return null;
+    const credential = JSON.parse(raw) as Partial<DriveSessionCredential> & {
+      version?: number;
+    };
+    if (
+      credential.version !== DRIVE_SESSION_VERSION ||
+      typeof credential.accessToken !== "string" ||
+      typeof credential.expiresAt !== "number" ||
+      !Array.isArray(credential.scopes) ||
+      !credential.scopes.every((scope) => typeof scope === "string") ||
+      !Number.isFinite(credential.expiresAt) ||
+      credential.expiresAt <= Date.now() + DRIVE_SESSION_EXPIRY_BUFFER_MS
+    ) {
+      sessionStorage.removeItem(DRIVE_SESSION_KEY);
+      return null;
+    }
+    return {
+      accessToken: credential.accessToken,
+      expiresAt: credential.expiresAt,
+      scopes: credential.scopes,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function setDriveSessionCredential(
+  credential: DriveSessionCredential,
+): void {
+  try {
+    sessionStorage.setItem(DRIVE_SESSION_KEY, JSON.stringify({
+      ...credential,
+      version: DRIVE_SESSION_VERSION,
+    }));
+  } catch {
+    // Autosync still works for this page even if session storage is unavailable.
+  }
+}
+
+export function clearDriveSessionCredential(): void {
+  try {
+    sessionStorage.removeItem(DRIVE_SESSION_KEY);
+  } catch {
+    // The in-memory credential is still cleared by the caller.
+  }
 }
