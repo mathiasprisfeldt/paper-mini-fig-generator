@@ -57,11 +57,18 @@ export function loadCatalogues(): Catalogue[] {
   try {
     const raw = localStorage.getItem(CATALOGUES_KEY);
     if (!raw) return [];
-    const catalogues = JSON.parse(raw) as Catalogue[];
-    return catalogues.map((c) => ({
-      ...c,
-      entries: c.entries.map(migrateMiniFigEntry),
-    }));
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((value): Catalogue[] => {
+      if (!value || typeof value !== "object") return [];
+      const catalogue = value as Catalogue;
+      return [{
+        ...catalogue,
+        entries: Array.isArray(catalogue.entries)
+          ? catalogue.entries.map(migrateMiniFigEntry)
+          : [],
+      }];
+    });
   } catch {
     return [];
   }
