@@ -22,18 +22,26 @@ const VALID_CREATURE_SIZES: CreatureSize[] = [
 ];
 
 export function migrateMiniFigEntry(e: unknown): MiniFigEntry {
-  const raw = e as Record<string, unknown>;
+  const raw =
+    e && typeof e === "object" ? e as Record<string, unknown> : {};
   const quantity =
     typeof raw.quantity === "number" && Number.isFinite(raw.quantity)
       ? Math.min(99, Math.max(0, Math.trunc(raw.quantity)))
       : 1;
   return {
-    id: (raw.id as string) || crypto.randomUUID(),
-    name: (raw.name as string) || "",
-    imageDataUrl: (raw.imageDataUrl as string | null) ?? null,
-    imageUrl: (raw.imageUrl as string | null) ?? null,
-    imageDriveFileId: (raw.imageDriveFileId as string | null) ?? null,
-    sourceId: (raw.sourceId as string | null) ?? null,
+    id:
+      typeof raw.id === "string" && raw.id
+        ? raw.id
+        : crypto.randomUUID(),
+    name: typeof raw.name === "string" ? raw.name : "",
+    imageDataUrl:
+      typeof raw.imageDataUrl === "string" ? raw.imageDataUrl : null,
+    imageUrl: typeof raw.imageUrl === "string" ? raw.imageUrl : null,
+    imageDriveFileId:
+      typeof raw.imageDriveFileId === "string"
+        ? raw.imageDriveFileId
+        : null,
+    sourceId: typeof raw.sourceId === "string" ? raw.sourceId : null,
     quantity,
     showName: typeof raw.showName === "boolean" ? raw.showName : true,
     miniSize: VALID_MINI_SIZES.includes(raw.miniSize as MiniSize)
