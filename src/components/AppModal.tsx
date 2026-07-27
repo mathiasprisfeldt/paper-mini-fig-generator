@@ -1,4 +1,9 @@
-import { useEffect, type KeyboardEventHandler, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  type KeyboardEventHandler,
+  type ReactNode,
+} from "react";
 
 interface Props {
   children: ReactNode;
@@ -21,6 +26,16 @@ export function AppModal({
   onKeyDown,
   onClose,
 }: Props) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog || dialog.contains(document.activeElement)) return;
+    const autofocusTarget = dialog.querySelector<HTMLElement>("[autofocus]");
+    (autofocusTarget ?? closeButtonRef.current)?.focus();
+  }, []);
+
   useEffect(() => {
     const previousBodyOverflow = document.body.style.overflow;
     const previousBodyPaddingRight = document.body.style.paddingRight;
@@ -56,6 +71,7 @@ export function AppModal({
       }}
     >
       <section
+        ref={dialogRef}
         className={`app-dialog ${className}`.trim()}
         role="dialog"
         aria-modal="true"
@@ -64,6 +80,7 @@ export function AppModal({
         onKeyDown={onKeyDown}
       >
         <button
+          ref={closeButtonRef}
           type="button"
           className="dialog-close modal-shell-close"
           onClick={onClose}
