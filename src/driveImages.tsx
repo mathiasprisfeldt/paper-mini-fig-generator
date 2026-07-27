@@ -50,12 +50,17 @@ export function DriveImageProvider({ accessToken, children }: ProviderProps) {
 
     const request = downloadDriveImageBlob(accessToken, fileId)
       .then((blob) => {
+        if (cacheRef.current.get(fileId) !== request) {
+          throw new Error("Drive image request was superseded.");
+        }
         const url = URL.createObjectURL(blob);
         objectUrlsRef.current.add(url);
         return url;
       })
       .catch((error) => {
-        cacheRef.current.delete(fileId);
+        if (cacheRef.current.get(fileId) === request) {
+          cacheRef.current.delete(fileId);
+        }
         throw error;
       });
     cacheRef.current.set(fileId, request);
