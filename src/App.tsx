@@ -838,10 +838,15 @@ function App() {
       const resolved = await resolveDriveSourceEntries(selected);
       await generatePdf(resolved, paperFormat, "paper-minis");
     } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : "Could not generate the PDF.";
+      const isCorsError =
+        error instanceof DOMException && error.name === "SecurityError";
       setExportError(
-        error instanceof Error
-          ? `${error.message}. If this is a linked image, check that its host allows CORS.`
-          : "Could not generate the PDF.",
+        isCorsError
+          ? `${message.replace(/[.\s]+$/, "")}. If this is a linked image, check that its host allows CORS.`
+          : message,
       );
     } finally {
       setGenerating(false);
