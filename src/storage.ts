@@ -62,11 +62,23 @@ export function loadCatalogues(): Catalogue[] {
     return parsed.flatMap((value): Catalogue[] => {
       if (!value || typeof value !== "object") return [];
       const catalogue = value as Catalogue;
+      const createdAt =
+        typeof catalogue.createdAt === "number" &&
+        Number.isFinite(catalogue.createdAt)
+          ? catalogue.createdAt
+          : 0;
+      const updatedAt =
+        typeof catalogue.updatedAt === "number" &&
+        Number.isFinite(catalogue.updatedAt)
+          ? catalogue.updatedAt
+          : 0;
       return [{
         ...catalogue,
         entries: Array.isArray(catalogue.entries)
           ? catalogue.entries.map(migrateMiniFigEntry)
           : [],
+        createdAt,
+        updatedAt,
       }];
     });
   } catch {
