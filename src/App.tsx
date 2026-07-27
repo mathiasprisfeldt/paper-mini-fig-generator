@@ -80,8 +80,19 @@ function normalizeAsBinder(catalogues: Catalogue[]): Catalogue[] {
     seen.add(entry.id);
     return true;
   });
-  const createdAt = Math.min(...catalogues.map((catalogue) => catalogue.createdAt));
-  const updatedAt = Math.max(...catalogues.map((catalogue) => catalogue.updatedAt));
+  const now = Date.now();
+  const createdAtValues = catalogues
+    .map((catalogue) => catalogue.createdAt)
+    .filter(Number.isFinite);
+  const updatedAtValues = catalogues
+    .map((catalogue) => catalogue.updatedAt)
+    .filter(Number.isFinite);
+  const createdAt = createdAtValues.length > 0
+    ? Math.min(...createdAtValues)
+    : now;
+  const updatedAt = updatedAtValues.length > 0
+    ? Math.max(...updatedAtValues)
+    : now;
 
   return [{
     id: catalogues[0].id,
