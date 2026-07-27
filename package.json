@@ -2,6 +2,7 @@
   "name": "paper-mini-fig-generator",
   "private": true,
   "version": "0.0.0",
+  "packageManager": "yarn@4.9.4",
   "type": "module",
   "scripts": {
     "dev": "vite",

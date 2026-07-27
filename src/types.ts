@@ -14,10 +14,39 @@ export interface MiniFigEntry {
   id: string;
   name: string;
   imageDataUrl: string | null;
+  imageUrl: string | null;
+  imageDriveFileId: string | null;
+  sourceId: string | null;
   quantity: number;
   showName: boolean;
   miniSize: MiniSize;
   creatureSize: CreatureSize;
+}
+
+interface CreatureSourceBase {
+  id: string;
+  name: string;
+  updatedAt: number;
+}
+
+export interface HtmlCreatureSource extends CreatureSourceBase {
+  type: "html";
+  url: string;
+  selector: string;
+}
+
+export interface DriveCreatureSource extends CreatureSourceBase {
+  type: "drive";
+  folderId: string;
+  folderName: string;
+}
+
+export type CreatureSource = HtmlCreatureSource | DriveCreatureSource;
+
+export interface SourceRefreshResult {
+  total: number;
+  added: number;
+  removed: number;
 }
 
 export interface Catalogue {
