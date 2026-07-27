@@ -88,40 +88,13 @@ export function loadCatalogues(): Catalogue[] {
 
 export function saveCatalogues(catalogues: Catalogue[]): void {
   // Keep pre-integration images only until their entry has a Drive file ID.
-  // Newly selected images are never added to localStorage.
-  const legacyImages = new Map<string, string>();
-  try {
-    const existing: unknown = JSON.parse(
-      localStorage.getItem(CATALOGUES_KEY) || "[]",
-    );
-    if (Array.isArray(existing)) {
-      for (const value of existing) {
-        if (!value || typeof value !== "object") continue;
-        const catalogue = value as Record<string, unknown>;
-        if (!Array.isArray(catalogue.entries)) continue;
-        for (const entryValue of catalogue.entries) {
-          if (!entryValue || typeof entryValue !== "object") continue;
-          const entry = entryValue as Record<string, unknown>;
-          if (
-            typeof entry.id === "string" &&
-            typeof entry.imageDataUrl === "string"
-          ) {
-            legacyImages.set(entry.id, entry.imageDataUrl);
-          }
-        }
-      }
-    }
-  } catch {
-    // Invalid legacy state will be replaced with clean metadata.
-  }
-
   const metadataOnly = catalogues.map((catalogue) => ({
     ...catalogue,
     entries: catalogue.entries.map((entry) => ({
       ...entry,
       imageDataUrl: entry.imageDriveFileId
         ? null
-        : (legacyImages.get(entry.id) ?? null),
+        : entry.imageDataUrl,
     })),
   }));
   localStorage.setItem(CATALOGUES_KEY, JSON.stringify(metadataOnly));
