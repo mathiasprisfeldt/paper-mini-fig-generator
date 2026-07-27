@@ -61,7 +61,7 @@ export function SourceDialog({
     resetFeedback();
     let normalizedUrl: string;
     try {
-      normalizedUrl = new URL(url).toString();
+      normalizedUrl = new URL(url.trim()).toString();
     } catch {
       setError("Enter a complete source URL, including https://");
       return;
