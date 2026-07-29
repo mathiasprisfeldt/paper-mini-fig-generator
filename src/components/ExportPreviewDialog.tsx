@@ -12,6 +12,13 @@ interface Props {
 
 export function ExportPreviewDialog({ entry, resolveEntry, onClose }: Props) {
   const [previewUrl, setPreviewUrl] = useState("");
+  // The rendered preview is a single vertical strip: a mirrored "back" copy of
+  // the figure on top of the fold line, and the upright "front" copy below it
+  // (see the LAYOUT GLOSSARY in generatePdf.ts). Because both bands and both
+  // figure copies are always equal in height, that fold line sits at exactly
+  // the vertical midpoint of the rendered image, so we can crop the top/bottom
+  // halves with plain CSS instead of re-rendering anything.
+  const [previewAspect, setPreviewAspect] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"folded" | "layout">("folded");
 
@@ -24,8 +31,17 @@ export function ExportPreviewDialog({ entry, resolveEntry, onClose }: Props) {
       )
       .then((url) => {
         if (!active) return;
-        if (url) setPreviewUrl(url);
-        else setError("This creature does not have an image to preview.");
+        if (url) {
+          setPreviewUrl(url);
+          const image = new Image();
+          image.onload = () => {
+            if (!active) return;
+            setPreviewAspect(image.naturalWidth / image.naturalHeight);
+          };
+          image.src = url;
+        } else {
+          setError("This creature does not have an image to preview.");
+        }
       })
       .catch((caught: unknown) => {
         if (!active) return;
@@ -73,10 +89,25 @@ export function ExportPreviewDialog({ entry, resolveEntry, onClose }: Props) {
             <div
               className="miniature-3d-scene"
               role="img"
-              aria-label={`Folded three-dimensional paper miniature of ${entry.name || "this creature"}`}
+              aria-label={`Folded three-dimensional paper miniature of ${entry.name || "this creature"}, opened slightly to reveal both the front and back artwork`}
             >
-              <div className="miniature-3d-figure" aria-hidden="true">
-                <img src={previewUrl} alt="" />
+              <div
+                className="miniature-3d-figure"
+                aria-hidden="true"
+                style={previewAspect ? { aspectRatio: `${previewAspect}` } : undefined}
+              >
+                <div className="miniature-3d-panel miniature-3d-panel-back">
+                  <div
+                    className="miniature-3d-panel-art"
+                    style={{ backgroundImage: `url(${previewUrl})` }}
+                  />
+                </div>
+                <div className="miniature-3d-panel miniature-3d-panel-front">
+                  <div
+                    className="miniature-3d-panel-art"
+                    style={{ backgroundImage: `url(${previewUrl})` }}
+                  />
+                </div>
               </div>
               <div className="miniature-3d-base" aria-hidden="true" />
             </div>
@@ -85,7 +116,7 @@ export function ExportPreviewDialog({ entry, resolveEntry, onClose }: Props) {
 
         <p className="export-preview-help">
           {mode === "folded"
-            ? "A folded representation of the miniature and its standing base."
+            ? "Opened partway to show the front artwork and the mirrored back artwork that appears once the strip is folded and glued into a standee."
             : "This is the strip placed in the PDF. Fold it between the mirrored and upright artwork."}
         </p>
     </AppModal>

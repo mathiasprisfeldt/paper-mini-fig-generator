@@ -891,8 +891,17 @@ function App() {
     setGenerating(true);
     try {
       const resolved = await resolveDriveSourceEntries(selected);
+      const quantityById = new Map(
+        selected.map((entry) => [entry.id, entry.quantity]),
+      );
+      const resolvedForPrint: PrintableMiniFigEntry[] = resolved.map(
+        (entry) => ({
+          ...entry,
+          quantity: quantityById.get(entry.id) ?? 0,
+        }),
+      );
       await generatePdf(
-        resolved as PrintableMiniFigEntry[],
+        resolvedForPrint,
         paperFormat,
         "paper-minis",
         printLayout,
@@ -948,10 +957,7 @@ function App() {
           onChange={(_, nextView: AppView) => changeView(nextView)}
           aria-label="App sections"
         >
-          <Tab
-            value="binder"
-            label={<Badge badgeContent={entries.length} color="primary">Binder</Badge>}
-          />
+          <Tab value="binder" label="Binder" />
           <Tab
             value="print"
             label={<Badge badgeContent={selectedTotal} color="primary">Print</Badge>}

@@ -30,8 +30,11 @@ export function AppModal({
       }}
       aria-label={ariaLabel}
       aria-labelledby={ariaLabelledBy}
-      className={backdropClassName}
-      slotProps={{ paper: { className: `app-dialog ${className}`.trim() } }}
+      maxWidth={false}
+      slotProps={{
+        backdrop: { className: backdropClassName },
+        paper: { className: `app-dialog ${className}`.trim() },
+      }}
     >
       <DialogContent
         onKeyDown={onKeyDown}

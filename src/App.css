@@ -849,9 +849,8 @@
 
 .settings-view {
   display: grid;
-  width: min(760px, 100%);
+  width: 100%;
   gap: 1rem;
-  margin: 0 auto;
 }
 
 .settings-heading p {
@@ -1064,7 +1063,7 @@
   overscroll-behavior: contain;
 }
 
-.quick-add-dialog {
+.app-dialog.quick-add-dialog {
   width: min(560px, calc(100vw - 2rem));
   overflow: hidden;
 }
@@ -1390,7 +1389,7 @@
   overscroll-behavior: contain;
 }
 
-.export-preview-dialog {
+.app-dialog.export-preview-dialog {
   width: min(680px, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
   overflow: auto;
@@ -1442,25 +1441,68 @@
   width: min(58%, 280px);
   min-height: 380px;
   place-items: end center;
-  perspective: 900px;
-  transform-style: preserve-3d;
+  perspective: 700px;
 }
 
 .miniature-3d-figure {
   position: absolute;
+  left: 50%;
   bottom: 70px;
-  display: grid;
-  max-height: 310px;
+  height: min(300px, 42vh);
+  width: auto;
+  aspect-ratio: 0.6;
+  transform: translateX(-50%) rotateX(46deg) rotateZ(-14deg);
+  transform-style: preserve-3d;
+  filter: drop-shadow(0 26px 20px rgba(0, 0, 0, 0.55));
+}
+
+/* Each panel shows one half (crease to crease) of the printed strip, at its
+   native scale (background-size 100% 200% + background-position top/bottom),
+   so neither half is stretched or distorted. The two panels share the same
+   transform-origin line (the strip's fold line, at 50% of the figure), so
+   rotating them in opposite directions opens the standee like a book/tent
+   hinged along that crease — revealing the front face and the (un-mirrored)
+   back face at once instead of just tilting the flat, unfolded strip. */
+.miniature-3d-panel {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50%;
   overflow: hidden;
-  place-items: center;
-  transform: rotateX(-3deg) rotateY(-24deg);
-  transform-origin: bottom center;
-  filter: drop-shadow(18px 18px 14px rgba(0, 0, 0, 0.5));
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.4);
   backface-visibility: hidden;
 }
 
-.miniature-3d-figure img {
-  max-height: 310px;
+.miniature-3d-panel-art {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size: 100% 200%;
+}
+
+.miniature-3d-panel-back {
+  top: 0;
+  transform-origin: bottom center;
+  transform: rotateX(-62deg);
+}
+
+.miniature-3d-panel-back .miniature-3d-panel-art {
+  background-position: top;
+  /* The back half is pre-mirrored/rotated in print so that, once the strip
+     is folded back and viewed from behind, it reads correctly. Viewing the
+     printed pixels from the reverse side is itself a further 180° flip, so
+     undo the print-time transform with a matching 180° rotation here. */
+  transform: rotate(180deg);
+}
+
+.miniature-3d-panel-front {
+  top: 50%;
+  transform-origin: top center;
+  transform: rotateX(62deg);
+}
+
+.miniature-3d-panel-front .miniature-3d-panel-art {
+  background-position: bottom;
 }
 
 .miniature-3d-base {
@@ -1759,7 +1801,7 @@
   border: 0;
 }
 
-.source-dialog {
+.app-dialog.source-dialog {
   width: min(820px, 100%);
 }
 
