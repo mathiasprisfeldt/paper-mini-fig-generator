@@ -186,7 +186,6 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
         imageDriveFileId: null,
         blurHash: null,
         sourceId: null,
-        quantity: 0,
         showName,
         miniSize,
         creatureSize,

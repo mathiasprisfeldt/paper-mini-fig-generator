@@ -24,10 +24,6 @@ const VALID_CREATURE_SIZES: CreatureSize[] = [
 export function migrateMiniFigEntry(e: unknown): MiniFigEntry {
   const raw =
     e && typeof e === "object" ? e as Record<string, unknown> : {};
-  const quantity =
-    typeof raw.quantity === "number" && Number.isFinite(raw.quantity)
-      ? Math.min(99, Math.max(0, Math.trunc(raw.quantity)))
-      : 1;
   return {
     id:
       typeof raw.id === "string" && raw.id
@@ -43,7 +39,6 @@ export function migrateMiniFigEntry(e: unknown): MiniFigEntry {
         : null,
     blurHash: typeof raw.blurHash === "string" ? raw.blurHash : null,
     sourceId: typeof raw.sourceId === "string" ? raw.sourceId : null,
-    quantity,
     showName: typeof raw.showName === "boolean" ? raw.showName : true,
     miniSize: VALID_MINI_SIZES.includes(raw.miniSize as MiniSize)
       ? (raw.miniSize as MiniSize)

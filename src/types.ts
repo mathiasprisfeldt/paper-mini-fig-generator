@@ -1,6 +1,7 @@
 export type MiniSize = 24 | 28 | 32;
 
 export type PaperFormat = "a4" | "a3";
+export type PrintLayout = "compact" | "per-creature";
 
 export type CreatureSize =
   | "tiny"
@@ -18,10 +19,13 @@ export interface MiniFigEntry {
   imageDriveFileId: string | null;
   blurHash: string | null;
   sourceId: string | null;
-  quantity: number;
   showName: boolean;
   miniSize: MiniSize;
   creatureSize: CreatureSize;
+}
+
+export interface PrintableMiniFigEntry extends MiniFigEntry {
+  quantity: number;
 }
 
 interface CreatureSourceBase {

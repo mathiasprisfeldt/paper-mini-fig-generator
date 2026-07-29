@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { DriveCreatureImage } from "../driveImages";
-import type { MiniFigEntry } from "../types";
+import type { PrintableMiniFigEntry } from "../types";
 import { AppModal } from "./AppModal";
 
 interface Props {
-  entries: MiniFigEntry[];
+  entries: PrintableMiniFigEntry[];
   onAdd: (id: string) => void;
   onClose: () => void;
 }
@@ -31,7 +31,7 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
     });
   }, [activeEntry]);
 
-  const addCreature = (entry: MiniFigEntry) => {
+  const addCreature = (entry: PrintableMiniFigEntry) => {
     onAdd(entry.id);
     setAnnouncement(
       `${entry.name || "Creature"} added · ${entry.quantity + 1} selected`,

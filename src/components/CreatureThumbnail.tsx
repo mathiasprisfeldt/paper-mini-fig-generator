@@ -11,7 +11,6 @@ import type { MiniFigEntry } from "../types";
 interface Props {
   entry: MiniFigEntry;
   className?: string;
-  showSelection?: boolean;
   showHint?: boolean;
   onPreview: (id: string) => void;
   onBlurHash?: (id: string, blurHash: string) => void;
@@ -20,7 +19,6 @@ interface Props {
 export function CreatureThumbnail({
   entry,
   className = "",
-  showSelection = false,
   showHint = true,
   onPreview,
   onBlurHash,
@@ -127,9 +125,6 @@ export function CreatureThumbnail({
         </>
       ) : (
         <span className="creature-thumbnail-empty" aria-hidden="true">◇</span>
-      )}
-      {showSelection && entry.quantity > 0 && (
-        <span className="selected-badge">{entry.quantity} selected</span>
       )}
       {showHint && (
         <span className="preview-hint" aria-hidden="true">Preview print</span>
