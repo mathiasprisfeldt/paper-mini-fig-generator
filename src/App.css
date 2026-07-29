@@ -82,6 +82,28 @@
   font-weight: 600;
 }
 
+.drive-sync-copy .drive-configuration-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+  color: #fca5a5;
+  font-weight: 600;
+}
+
+.drive-configuration-error > span:first-child {
+  display: grid;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  place-items: center;
+  margin-top: 0.05rem;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
 .drive-local-warning > span:first-child {
   flex-shrink: 0;
 }
@@ -1231,8 +1253,11 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  transition: transform 420ms cubic-bezier(0.2, 0.75, 0.25, 1);
-  will-change: transform;
+  opacity: 1;
+  transition:
+    opacity 450ms ease-in-out,
+    transform 420ms cubic-bezier(0.2, 0.75, 0.25, 1);
+  will-change: opacity, transform;
 }
 
 .creature-thumbnail-empty {
@@ -1242,6 +1267,63 @@
   place-items: center;
   color: var(--text-muted);
   font-size: 1.4rem;
+}
+
+.creature-thumbnail-placeholder {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--surface-hover);
+  background-position: center;
+  background-size: cover;
+  opacity: 1;
+  pointer-events: none;
+  z-index: 2;
+  transition: opacity 450ms ease-in-out;
+  will-change: opacity;
+}
+
+.creature-thumbnail-placeholder.is-loaded {
+  opacity: 0;
+}
+
+.creature-thumbnail-placeholder.is-neutral::after,
+.creature-thumbnail-placeholder.has-blurhash::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  transform: translateX(-100%);
+  animation: creature-thumbnail-shimmer 1.4s ease-in-out infinite;
+}
+
+.creature-thumbnail-placeholder.is-neutral::after,
+.creature-thumbnail-placeholder.has-blurhash::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.12),
+    transparent
+  );
+}
+
+@keyframes creature-thumbnail-shimmer {
+  to { transform: translateX(100%); }
+}
+
+.creature-thumbnail.is-loading img {
+  opacity: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .creature-art-backdrop {
@@ -1292,8 +1374,13 @@
 
 @media (prefers-reduced-motion: reduce) {
   .creature-thumbnail img,
+  .creature-thumbnail-placeholder,
   .preview-hint {
     transition: none;
+  }
+
+  .creature-thumbnail-placeholder::after {
+    animation: none;
   }
 }
 

@@ -254,6 +254,7 @@ export function CreatureBinder({
                       entry={entry}
                       showSelection
                       onPreview={onPreview}
+                      onBlurHash={(id, blurHash) => onUpdate(id, { blurHash })}
                     />
 
                     <div className="creature-card-body">

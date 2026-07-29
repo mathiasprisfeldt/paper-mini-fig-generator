@@ -40,6 +40,15 @@ export function GoogleDriveSync({
           {autosyncEnabled && <span className="drive-sync-badge">Autosync on</span>}
         </div>
         <p>{message}</p>
+        {!configured && (
+          <p className="drive-configuration-error" role="alert">
+            <span aria-hidden="true">!</span>
+            <span>
+              Google Drive is not configured for this deployment. The site
+              administrator must add the Google OAuth settings and reload the app.
+            </span>
+          </p>
+        )}
         {!connected && (
           <p className="drive-local-warning" role="status">
             <span aria-hidden="true">⚠</span>
@@ -56,8 +65,11 @@ export function GoogleDriveSync({
             className="btn btn-drive"
             onClick={onConnect}
             disabled={!configured || busy}
+            title={!configured ? "Google Drive setup is required" : undefined}
           >
-            {status === "connecting"
+            {!configured
+              ? "Setup required"
+              : status === "connecting"
               ? "Connecting…"
               : status === "syncing"
                 ? "Loading Drive…"

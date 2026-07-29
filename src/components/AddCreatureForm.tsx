@@ -184,6 +184,7 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
         name: name.trim(),
         ...source,
         imageDriveFileId: null,
+        blurHash: null,
         sourceId: null,
         quantity: 0,
         showName,

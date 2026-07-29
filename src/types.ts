@@ -16,6 +16,7 @@ export interface MiniFigEntry {
   imageDataUrl: string | null;
   imageUrl: string | null;
   imageDriveFileId: string | null;
+  blurHash: string | null;
   sourceId: string | null;
   quantity: number;
   showName: boolean;

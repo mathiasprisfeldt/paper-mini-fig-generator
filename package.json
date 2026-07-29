@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.14.8",
+    "blurhash": "^2.0.5",
     "jspdf": "^4.2.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"

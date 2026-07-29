@@ -128,6 +128,7 @@ function createDriveSyncSignature(
           ? null
           : hashImageData(entry.imageDataUrl),
         imageUrl: entry.imageUrl,
+        blurHash: entry.blurHash,
         sourceId: entry.sourceId,
         quantity: entry.quantity,
         showName: entry.showName,
@@ -328,6 +329,12 @@ function App() {
               imageDataUrl: item.imageDataUrl,
               imageUrl: item.imageUrl,
               imageDriveFileId: item.imageDriveFileId,
+              blurHash:
+                saved.imageDataUrl === item.imageDataUrl
+                && saved.imageUrl === item.imageUrl
+                && saved.imageDriveFileId === item.imageDriveFileId
+                  ? saved.blurHash
+                  : null,
               sourceId: source.id,
             }
           : {
@@ -336,6 +343,7 @@ function App() {
               imageDataUrl: item.imageDataUrl,
               imageUrl: item.imageUrl,
               imageDriveFileId: item.imageDriveFileId,
+              blurHash: null,
               sourceId: source.id,
               quantity: 0,
               showName: true,
@@ -944,6 +952,7 @@ function App() {
             generating={generating}
             exportError={exportError}
             onQuantityChange={setQuantity}
+            onBlurHash={(id, blurHash) => updateEntry(id, { blurHash })}
             onPreview={openCreaturePreview}
             onQuickAdd={() => openNavigationModal("quick-add")}
             onClearSelection={clearPrintSelection}
