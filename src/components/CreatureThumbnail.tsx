@@ -33,11 +33,15 @@ export function CreatureThumbnail({
             className="creature-art-backdrop"
             alt=""
             aria-hidden="true"
+            decoding="async"
+            loading="lazy"
           />
           <DriveCreatureImage
             entry={entry}
             className="creature-art-foreground"
             alt=""
+            decoding="async"
+            loading="lazy"
           />
         </>
       ) : (

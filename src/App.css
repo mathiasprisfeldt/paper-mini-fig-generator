@@ -1182,6 +1182,18 @@
   gap: 1rem;
 }
 
+.creature-grid-virtual {
+  position: relative;
+  width: 100%;
+}
+
+.creature-grid-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
 .creature-card {
   overflow: hidden;
   background: var(--surface);
