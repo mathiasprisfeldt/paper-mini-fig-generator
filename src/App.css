@@ -757,7 +757,17 @@
 }
 
 .view-tabs button {
+  position: relative;
+  z-index: 1;
   padding: 0.55rem 0.85rem;
+}
+
+.view-tabs .MuiTabs-indicator {
+  top: 0;
+  bottom: 0;
+  height: auto;
+  background: var(--accent);
+  border-radius: 999px;
 }
 
 .view-tabs .settings-tab {
@@ -775,6 +785,9 @@
 .view-tabs button.Mui-selected,
 .source-tabs button.active {
   color: white;
+}
+
+.source-tabs button.active {
   background: var(--accent);
 }
 
