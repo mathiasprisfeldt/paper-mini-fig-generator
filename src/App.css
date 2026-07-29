@@ -1876,7 +1876,7 @@
   border-color: var(--accent);
 }
 
-.modal-shell-close {
+.dialog-close.modal-shell-close {
   position: absolute;
   top: 1rem;
   right: 1rem;
