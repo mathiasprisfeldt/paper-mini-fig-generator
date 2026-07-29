@@ -509,8 +509,10 @@ function App() {
     const nextQuantity = Math.min(99, Math.max(0, Math.round(quantity) || 0));
     setPrintQuantities((current) => {
       if (nextQuantity === 0) {
-        const { [id]: _, ...rest } = current;
-        return rest;
+        if (!(id in current)) return current;
+        const next = { ...current };
+        delete next[id];
+        return next;
       }
       return { ...current, [id]: nextQuantity };
     });
