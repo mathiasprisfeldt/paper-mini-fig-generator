@@ -41,6 +41,7 @@ export function migrateMiniFigEntry(e: unknown): MiniFigEntry {
       typeof raw.imageDriveFileId === "string"
         ? raw.imageDriveFileId
         : null,
+    blurHash: typeof raw.blurHash === "string" ? raw.blurHash : null,
     sourceId: typeof raw.sourceId === "string" ? raw.sourceId : null,
     quantity,
     showName: typeof raw.showName === "boolean" ? raw.showName : true,

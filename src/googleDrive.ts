@@ -625,6 +625,7 @@ export async function discoverDriveFolderCreatures(
     imageDataUrl: null,
     imageUrl: null,
     imageDriveFileId: file.id,
+    blurHash: null,
   }));
 }
 

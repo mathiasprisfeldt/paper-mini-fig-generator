@@ -8,6 +8,7 @@ interface Props {
   generating: boolean;
   exportError: string;
   onQuantityChange: (id: string, quantity: number) => void;
+  onBlurHash: (id: string, blurHash: string) => void;
   onPreview: (id: string) => void;
   onQuickAdd: () => void;
   onClearSelection: () => void;
@@ -21,6 +22,7 @@ export function PrintBuilder({
   generating,
   exportError,
   onQuantityChange,
+  onBlurHash,
   onPreview,
   onQuickAdd,
   onClearSelection,
@@ -79,6 +81,7 @@ export function PrintBuilder({
                   entry={entry}
                   showHint={false}
                   onPreview={onPreview}
+                  onBlurHash={onBlurHash}
                 />
                 <div className="print-creature-info">
                   <strong>{entry.name || "Unnamed creature"}</strong>
