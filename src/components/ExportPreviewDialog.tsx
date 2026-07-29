@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Tab, Tabs } from "@mui/material";
+import { FormControlLabel, Radio, RadioGroup } from "@mui/material";
 import { getEffectiveWidthMm, renderPreview } from "../generatePdf";
 import type { MiniFigEntry, PrintableMiniFigEntry } from "../types";
 import { AppModal } from "./AppModal";
@@ -69,16 +69,6 @@ export function ExportPreviewDialog({ entry, resolveEntry, onClose }: Props) {
           </div>
         </header>
 
-        <Tabs
-          value={mode}
-          onChange={(_, value: "folded" | "layout") => setMode(value)}
-          aria-label="Preview mode"
-          centered
-        >
-          <Tab value="folded" label="Folded 3D" />
-          <Tab value="layout" label="Print layout" />
-        </Tabs>
-
         <div className={`export-preview-stage ${mode === "folded" ? "folded" : ""}`}>
           {!previewUrl && !error && <div className="preview-loading">Rendering preview…</div>}
           {error && <p className="form-error">{error}</p>}
@@ -112,6 +102,16 @@ export function ExportPreviewDialog({ entry, resolveEntry, onClose }: Props) {
               <div className="miniature-3d-base" aria-hidden="true" />
             </div>
           )}
+          <RadioGroup
+            className="preview-mode-picker"
+            value={mode}
+            onChange={(event) => setMode(event.target.value as "folded" | "layout")}
+            aria-label="Preview mode"
+            row
+          >
+            <FormControlLabel value="folded" control={<Radio size="small" />} label="Folded 3D" />
+            <FormControlLabel value="layout" control={<Radio size="small" />} label="Print layout" />
+          </RadioGroup>
         </div>
 
         <p className="export-preview-help">
