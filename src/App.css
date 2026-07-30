@@ -757,11 +757,23 @@
 }
 
 .view-tabs button {
+  position: relative;
+  z-index: 1;
   padding: 0.55rem 0.85rem;
+}
+
+.view-tabs .MuiTabs-indicator {
+  top: 0;
+  bottom: 0;
+  height: auto;
+  background: var(--accent);
+  border-radius: 999px;
 }
 
 .view-tabs .settings-tab {
   display: grid;
+  flex: 0 0 auto;
+  min-width: 2.35rem;
   width: 2.35rem;
   padding: 0;
   place-items: center;
@@ -772,21 +784,12 @@
   height: 1.05rem;
 }
 
-.view-tabs button span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.3rem;
-  margin-left: 0.3rem;
-  padding: 0 0.3rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
-  font-size: 0.7rem;
-}
-
-.view-tabs button.active,
+.view-tabs button.Mui-selected,
 .source-tabs button.active {
   color: white;
+}
+
+.source-tabs button.active {
   background: var(--accent);
 }
 
@@ -848,9 +851,8 @@
 
 .settings-view {
   display: grid;
-  width: min(760px, 100%);
+  width: 100%;
   gap: 1rem;
-  margin: 0 auto;
 }
 
 .settings-heading p {
@@ -1063,7 +1065,7 @@
   overscroll-behavior: contain;
 }
 
-.quick-add-dialog {
+.app-dialog.quick-add-dialog {
   width: min(560px, calc(100vw - 2rem));
   overflow: hidden;
 }
@@ -1389,7 +1391,7 @@
   overscroll-behavior: contain;
 }
 
-.export-preview-dialog {
+.app-dialog.export-preview-dialog {
   width: min(680px, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
   overflow: auto;
@@ -1410,6 +1412,7 @@
 }
 
 .export-preview-stage {
+  position: relative;
   display: grid;
   place-items: center;
   min-height: 360px;
@@ -1427,12 +1430,145 @@
   background-size: 16px 16px;
 }
 
+.preview-mode-picker {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  gap: 0.25rem;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(15, 17, 23, 0.9);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+}
+
+.preview-mode-picker .MuiFormControlLabel-root {
+  margin: 0;
+}
+
+.preview-mode-picker .MuiFormControlLabel-label {
+  padding-right: 0.35rem;
+  font-size: 0.72rem;
+}
+
 .export-preview-stage img {
   display: block;
   max-width: 100%;
   max-height: min(65vh, 680px);
   object-fit: contain;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+
+.miniature-3d-scene {
+  position: relative;
+  display: grid;
+  width: min(58%, 280px);
+  min-height: 380px;
+  place-items: end center;
+  perspective: 700px;
+}
+
+.miniature-3d-figure {
+  position: absolute;
+  left: 50%;
+  bottom: 70px;
+  height: min(300px, 42vh);
+  width: auto;
+  aspect-ratio: 0.6;
+  transform: translateX(-50%) rotateX(46deg) rotateZ(-14deg);
+  transform-style: preserve-3d;
+  filter: drop-shadow(0 26px 20px rgba(0, 0, 0, 0.55));
+}
+
+/* Each panel shows one half (crease to crease) of the printed strip, at its
+   native scale (background-size 100% 200% + background-position top/bottom),
+   so neither half is stretched or distorted. The two panels share the same
+   transform-origin line (the strip's fold line, at 50% of the figure), so
+   rotating them in opposite directions opens the standee like a book/tent
+   hinged along that crease — revealing the front face and the (un-mirrored)
+   back face at once instead of just tilting the flat, unfolded strip. */
+.miniature-3d-panel {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  overflow: hidden;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.4);
+  backface-visibility: hidden;
+}
+
+.miniature-3d-panel-art {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size: 100% 200%;
+}
+
+.miniature-3d-panel-back {
+  top: 0;
+  transform-origin: bottom center;
+  transform: rotateX(-62deg);
+}
+
+.miniature-3d-panel-back .miniature-3d-panel-art {
+  background-position: top;
+  /* The back half is pre-mirrored/rotated in print so that, once the strip
+     is folded back and viewed from behind, it reads correctly. Viewing the
+     printed pixels from the reverse side is itself a further 180° flip, so
+     undo the print-time transform with a matching 180° rotation here. */
+  transform: rotate(180deg);
+}
+
+.miniature-3d-panel-front {
+  top: 50%;
+  transform-origin: top center;
+  transform: rotateX(62deg);
+}
+
+.miniature-3d-panel-front .miniature-3d-panel-art {
+  background-position: bottom;
+}
+
+.miniature-3d-base {
+  width: 150px;
+  height: 95px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #363946, #171923);
+  box-shadow: 14px 20px 20px rgba(0, 0, 0, 0.45);
+  transform: rotateX(68deg) rotateZ(-12deg);
+  transform-origin: center;
+}
+
+.layout-hint {
+  display: block;
+  margin-top: 0.45rem;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.app-footer {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 3rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.app-footer a {
+  color: var(--accent-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .miniature-3d-figure,
+  .miniature-3d-base {
+    transition: none;
+  }
 }
 
 .preview-loading {
@@ -1443,23 +1579,6 @@
 .export-preview-help {
   margin-top: 0.9rem;
   text-align: center;
-}
-
-.selected-badge {
-  position: absolute;
-  top: 0.65rem;
-  padding: 0.2rem 0.48rem;
-  border-radius: 999px;
-  font-size: 0.62rem;
-  font-weight: 700;
-  backdrop-filter: blur(8px);
-}
-
-.selected-badge {
-  right: 0.65rem;
-  z-index: 2;
-  color: #bbf7d0;
-  background: rgba(21, 128, 61, 0.76);
 }
 
 .creature-card-body {
@@ -1705,9 +1824,16 @@
 .creature-dialog .add-creature-panel {
   padding: 0;
   border: 0;
+  background: transparent;
 }
 
-.source-dialog {
+.app-dialog.creature-dialog {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.14), transparent 34%),
+    var(--surface);
+}
+
+.app-dialog.source-dialog {
   width: min(820px, 100%);
 }
 
@@ -1725,14 +1851,24 @@
 .dialog-close {
   display: grid;
   place-items: center;
+  min-width: 32px;
   width: 32px;
   height: 32px;
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: 50%;
   color: var(--text-muted);
   background: var(--bg);
   cursor: pointer;
-  font-size: 1.2rem;
+}
+
+.dialog-close svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
 }
 
 .dialog-close:hover {
@@ -1740,7 +1876,7 @@
   border-color: var(--accent);
 }
 
-.modal-shell-close {
+.dialog-close.modal-shell-close {
   position: absolute;
   top: 1rem;
   right: 1rem;

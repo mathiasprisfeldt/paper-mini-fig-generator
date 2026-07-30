@@ -1,10 +1,16 @@
 import { useMemo, useState } from "react";
-import type { MiniFigEntry, PaperFormat } from "../types";
+import { ToggleButton, ToggleButtonGroup } from "@mui/material";
+import type {
+  PaperFormat,
+  PrintableMiniFigEntry,
+  PrintLayout,
+} from "../types";
 import { CreatureThumbnail } from "./CreatureThumbnail";
 
 interface Props {
-  entries: MiniFigEntry[];
+  entries: PrintableMiniFigEntry[];
   paperFormat: PaperFormat;
+  printLayout: PrintLayout;
   generating: boolean;
   exportError: string;
   onQuantityChange: (id: string, quantity: number) => void;
@@ -13,12 +19,14 @@ interface Props {
   onQuickAdd: () => void;
   onClearSelection: () => void;
   onPaperFormatChange: (format: PaperFormat) => void;
+  onPrintLayoutChange: (layout: PrintLayout) => void;
   onGenerate: () => void;
 }
 
 export function PrintBuilder({
   entries,
   paperFormat,
+  printLayout,
   generating,
   exportError,
   onQuantityChange,
@@ -27,6 +35,7 @@ export function PrintBuilder({
   onQuickAdd,
   onClearSelection,
   onPaperFormatChange,
+  onPrintLayoutChange,
   onGenerate,
 }: Props) {
   const [query, setQuery] = useState("");
@@ -139,17 +148,50 @@ export function PrintBuilder({
 
         <div className="paper-format-control">
           <span>Paper size</span>
-          <div className="format-picker">
+          <ToggleButtonGroup
+            className="format-picker"
+            exclusive
+            size="small"
+            value={paperFormat}
+            onChange={(_, format: PaperFormat | null) => {
+              if (format) onPaperFormatChange(format);
+            }}
+            aria-label="Paper size"
+          >
             {(["a4", "a3"] as PaperFormat[]).map((format) => (
-              <button
+              <ToggleButton
                 key={format}
-                className={`format-btn${paperFormat === format ? " active" : ""}`}
-                onClick={() => onPaperFormatChange(format)}
+                className="format-btn"
+                value={format}
               >
                 {format.toUpperCase()}
-              </button>
+              </ToggleButton>
             ))}
-          </div>
+          </ToggleButtonGroup>
+        </div>
+
+        <div className="paper-format-control">
+          <span>Page layout</span>
+          <ToggleButtonGroup
+            className="format-picker layout-picker"
+            exclusive
+            size="small"
+            value={printLayout}
+            onChange={(_, layout: PrintLayout | null) => {
+              if (layout) onPrintLayoutChange(layout);
+            }}
+            aria-label="PDF page layout"
+          >
+            <ToggleButton className="format-btn" value="compact">
+              Compact
+            </ToggleButton>
+            <ToggleButton className="format-btn" value="per-creature">
+              Per creature
+            </ToggleButton>
+          </ToggleButtonGroup>
+          <small className="layout-hint">
+            Per creature starts each creature type on a separate page for easier cutting.
+          </small>
         </div>
 
         {exportError && <p className="form-error">{exportError}</p>}

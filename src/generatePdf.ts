@@ -1,5 +1,11 @@
 import { jsPDF } from "jspdf";
-import type { MiniFigEntry, CreatureSize, PaperFormat } from "./types";
+import type {
+  MiniFigEntry,
+  CreatureSize,
+  PaperFormat,
+  PrintableMiniFigEntry,
+  PrintLayout,
+} from "./types";
 
 const FONT_FAMILY = "MedievalSharp, serif";
 const FONT_URL =
@@ -583,9 +589,10 @@ function drawMiniToPdf(pdf: jsPDF, mini: MiniPdfData, ox: number, oy: number) {
 }
 
 export async function generatePdf(
-  entries: MiniFigEntry[],
+  entries: PrintableMiniFigEntry[],
   format: PaperFormat = "a4",
   catalogueName = "paper-minis",
+  layout: PrintLayout = "compact",
 ): Promise<void> {
   await fontReady;
   const validEntries = entries.filter(
@@ -597,11 +604,12 @@ export async function generatePdf(
   const usableW = pageW - PAGE_MARGIN_MM * 2;
   const usableH = pageH - PAGE_MARGIN_MM * 2;
 
-  const allMinis: MiniPdfData[] = [];
+  const miniGroups: MiniPdfData[][] = [];
 
   for (const entry of validEntries) {
     const img = await loadImage(getEntryImageSource(entry)!);
     const widthMm = getEffectiveWidthMm(entry);
+    const minis: MiniPdfData[] = [];
     for (let i = 0; i < entry.quantity; i++) {
       const number = entry.quantity > 1 ? i + 1 : null;
       const heightMm = miniHeightMm(
@@ -610,7 +618,7 @@ export async function generatePdf(
         entry.showName && !!entry.name,
         number != null,
       );
-      allMinis.push({
+      minis.push({
         img,
         name: entry.name,
         showName: entry.showName,
@@ -619,10 +627,10 @@ export async function generatePdf(
         widthMm,
       });
     }
+    miniGroups.push(minis);
   }
 
-  // Sort by name/creature so identical types are grouped together
-  allMinis.sort((a, b) => a.name.localeCompare(b.name));
+  miniGroups.sort((a, b) => a[0].name.localeCompare(b[0].name));
 
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format });
   await ensureJsPdfFont(pdf);
@@ -631,8 +639,16 @@ export async function generatePdf(
   let pageY = PAGE_MARGIN_MM;
   let rowMaxH = 0;
 
-  for (let i = 0; i < allMinis.length; i++) {
-    const mini = allMinis[i];
+  for (let groupIndex = 0; groupIndex < miniGroups.length; groupIndex++) {
+    if (layout === "per-creature" && groupIndex > 0) {
+      pdf.addPage();
+      await ensureJsPdfFont(pdf);
+      pageX = PAGE_MARGIN_MM;
+      pageY = PAGE_MARGIN_MM;
+      rowMaxH = 0;
+    }
+
+    for (const mini of miniGroups[groupIndex]) {
 
     if (pageX + mini.widthMm > usableW + PAGE_MARGIN_MM) {
       pageX = PAGE_MARGIN_MM;
@@ -652,6 +668,7 @@ export async function generatePdf(
 
     if (mini.heightMm > rowMaxH) rowMaxH = mini.heightMm;
     pageX += mini.widthMm + SPACING_MM;
+    }
   }
 
   const safeName =

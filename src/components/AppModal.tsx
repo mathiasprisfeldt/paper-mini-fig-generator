@@ -1,9 +1,5 @@
-import {
-  useEffect,
-  useRef,
-  type KeyboardEventHandler,
-  type ReactNode,
-} from "react";
+import { type KeyboardEventHandler, type ReactNode } from "react";
+import { Dialog, DialogContent, IconButton } from "@mui/material";
 
 interface Props {
   children: ReactNode;
@@ -26,70 +22,35 @@ export function AppModal({
   onKeyDown,
   onClose,
 }: Props) {
-  const dialogRef = useRef<HTMLElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog || dialog.contains(document.activeElement)) return;
-    const autofocusTarget = dialog.querySelector<HTMLElement>("[autofocus]");
-    (autofocusTarget ?? closeButtonRef.current)?.focus();
-  }, []);
-
-  useEffect(() => {
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousBodyPaddingRight = document.body.style.paddingRight;
-    const previousDocumentOverflow = document.documentElement.style.overflow;
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
-    if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
-
-    return () => {
-      document.body.style.overflow = previousBodyOverflow;
-      document.body.style.paddingRight = previousBodyPaddingRight;
-      document.documentElement.style.overflow = previousDocumentOverflow;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!closeOnEscape) return;
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [closeOnEscape, onClose]);
-
   return (
-    <div
-      className={`dialog-backdrop ${backdropClassName}`.trim()}
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+    <Dialog
+      open
+      onClose={(_, reason) => {
+        if (reason !== "escapeKeyDown" || closeOnEscape) onClose();
+      }}
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
+      maxWidth={false}
+      slotProps={{
+        backdrop: { className: backdropClassName },
+        paper: { className: `app-dialog ${className}`.trim() },
       }}
     >
-      <section
-        ref={dialogRef}
-        className={`app-dialog ${className}`.trim()}
-        role="dialog"
-        aria-modal="true"
-        aria-label={ariaLabel}
-        aria-labelledby={ariaLabelledBy}
+      <DialogContent
         onKeyDown={onKeyDown}
+        sx={{ padding: 0, overflow: "visible" }}
       >
-        <button
-          ref={closeButtonRef}
-          type="button"
+        <IconButton
           className="dialog-close modal-shell-close"
           onClick={onClose}
           aria-label="Close"
         >
-          ×
-        </button>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </IconButton>
         {children}
-      </section>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

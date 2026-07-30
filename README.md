@@ -10,10 +10,11 @@ A web-based tool for creating printable 28mm paper miniatures for tabletop games
 
 - Keep a reusable binder of named creatures and their D&D sizes
 - Add artwork manually or connect an HTML page that lists hosted images
-- Select independent print quantities without duplicating binder entries
+- Select session-only print quantities without changing or syncing binder entries
 - Choose 24mm, 28mm, or 32mm mini scale and A4 or A3 paper
-- Generate print-ready PDFs with optional name labels
-- Sync the binder, print selection, settings, and uploaded images through
+- Generate compact print-ready PDFs or start each creature type on its own page
+- Preview miniatures as a folded 3D model or flat print layout
+- Sync the binder, settings, and uploaded images through
   private Google Drive app storage
 
 ## Getting Started

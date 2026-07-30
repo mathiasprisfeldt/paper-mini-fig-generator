@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Badge, Tab, Tabs } from "@mui/material";
 import type {
   Catalogue,
   CreatureSource,
   MiniFigEntry,
   PaperFormat,
+  PrintableMiniFigEntry,
+  PrintLayout,
   SourceRefreshResult,
 } from "./types";
 import { AddCreatureForm } from "./components/AddCreatureForm";
@@ -59,7 +62,9 @@ interface DriveSyncPayload {
 const PREVIEW_QUERY_PARAM = "preview";
 const MODAL_QUERY_PARAM = "modal";
 const SOURCE_QUERY_PARAM = "source";
+const VIEW_QUERY_PARAM = "view";
 const APP_MODALS: AppModalId[] = ["add-creature", "sources", "quick-add"];
+const APP_VIEWS: AppView[] = ["binder", "print", "settings"];
 const DRIVE_AUTOSYNC_DELAY_MS = 1000;
 
 function getModalFromUrl(): AppModalId | null {
@@ -69,6 +74,11 @@ function getModalFromUrl(): AppModalId | null {
 
 function getSourceFilterFromUrl(): string | null {
   return new URL(window.location.href).searchParams.get(SOURCE_QUERY_PARAM);
+}
+
+function getViewFromUrl(): AppView {
+  const view = new URL(window.location.href).searchParams.get(VIEW_QUERY_PARAM);
+  return APP_VIEWS.includes(view as AppView) ? view as AppView : "binder";
 }
 
 function normalizeAsBinder(catalogues: Catalogue[]): Catalogue[] {
@@ -130,7 +140,6 @@ function createDriveSyncSignature(
         imageUrl: entry.imageUrl,
         blurHash: entry.blurHash,
         sourceId: entry.sourceId,
-        quantity: entry.quantity,
         showName: entry.showName,
         miniSize: entry.miniSize,
         creatureSize: entry.creatureSize,
@@ -162,7 +171,7 @@ function App() {
   const [catalogues, setCatalogues] = useState<Catalogue[]>(() =>
     normalizeAsBinder(loadCatalogues()),
   );
-  const [view, setView] = useState<AppView>("binder");
+  const [view, setView] = useState<AppView>(getViewFromUrl);
   const [activeModal, setActiveModal] = useState<AppModalId | null>(getModalFromUrl);
   const [sourceFilter, setSourceFilter] = useState<string | null>(
     getSourceFilterFromUrl,
@@ -172,6 +181,8 @@ function App() {
   );
   const [sources, setSources] = useState<CreatureSource[]>(loadSources);
   const [paperFormat, setPaperFormatState] = useState<PaperFormat>(getPaperFormat);
+  const [printLayout, setPrintLayout] = useState<PrintLayout>("compact");
+  const [printQuantities, setPrintQuantities] = useState<Record<string, number>>({});
   const [generating, setGenerating] = useState(false);
   const [exportError, setExportError] = useState("");
   const [driveAccessToken, setDriveAccessToken] = useState<string | null>(
@@ -196,8 +207,19 @@ function App() {
   const driveRestoreAttempted = useRef(false);
 
   const entries = useMemo(() => catalogues[0]?.entries ?? [], [catalogues]);
-  const selectedTotal = entries.reduce((sum, entry) => sum + entry.quantity, 0);
-  const previewEntry = entries.find((entry) => entry.id === previewId) ?? null;
+  const printableEntries = useMemo<PrintableMiniFigEntry[]>(
+    () => entries.map((entry) => ({
+      ...entry,
+      quantity: printQuantities[entry.id] ?? 0,
+    })),
+    [entries, printQuantities],
+  );
+  const selectedTotal = printableEntries.reduce(
+    (sum, entry) => sum + entry.quantity,
+    0,
+  );
+  const previewEntry =
+    printableEntries.find((entry) => entry.id === previewId) ?? null;
 
   useEffect(() => {
     const syncNavigationFromHistory = () => {
@@ -205,10 +227,27 @@ function App() {
       setPreviewId(url.searchParams.get(PREVIEW_QUERY_PARAM));
       setActiveModal(getModalFromUrl());
       setSourceFilter(url.searchParams.get(SOURCE_QUERY_PARAM));
+      setView(getViewFromUrl());
     };
     window.addEventListener("popstate", syncNavigationFromHistory);
     return () => window.removeEventListener("popstate", syncNavigationFromHistory);
   }, []);
+
+  const changeView = useCallback((nextView: AppView) => {
+    if (nextView === view) return;
+    const url = new URL(window.location.href);
+    if (nextView === "binder") {
+      url.searchParams.delete(VIEW_QUERY_PARAM);
+    } else {
+      url.searchParams.set(VIEW_QUERY_PARAM, nextView);
+    }
+    window.history.pushState(
+      { ...window.history.state, paperMiniView: nextView },
+      "",
+      url,
+    );
+    setView(nextView);
+  }, [view]);
 
   const changeSourceFilter = useCallback((sourceId: string | null) => {
     const url = new URL(window.location.href);
@@ -345,7 +384,6 @@ function App() {
               imageDriveFileId: item.imageDriveFileId,
               blurHash: null,
               sourceId: source.id,
-              quantity: 0,
               showName: true,
               miniSize: 28,
               creatureSize: "medium",
@@ -468,14 +506,21 @@ function App() {
   }, [refreshSource, sources]);
 
   const setQuantity = useCallback((id: string, quantity: number) => {
-    updateEntry(id, { quantity: Math.min(99, Math.max(0, Math.round(quantity) || 0)) });
-  }, [updateEntry]);
+    const nextQuantity = Math.min(99, Math.max(0, Math.round(quantity) || 0));
+    setPrintQuantities((current) => {
+      if (nextQuantity === 0) {
+        if (!(id in current)) return current;
+        const next = { ...current };
+        delete next[id];
+        return next;
+      }
+      return { ...current, [id]: nextQuantity };
+    });
+  }, []);
 
   const clearPrintSelection = useCallback(() => {
-    setEntries((current) => current.map((entry) =>
-      entry.quantity === 0 ? entry : { ...entry, quantity: 0 },
-    ));
-  }, [setEntries]);
+    setPrintQuantities({});
+  }, []);
 
   const handleSetPaperFormat = useCallback((format: PaperFormat) => {
     setPaperFormatState(format);
@@ -839,12 +884,28 @@ function App() {
   ]);
 
   const handleGenerate = async () => {
-    const selected = entries.filter((entry) => entry.quantity > 0 && hasEntryImage(entry));
+    const selected = printableEntries.filter(
+      (entry) => entry.quantity > 0 && hasEntryImage(entry),
+    );
     setExportError("");
     setGenerating(true);
     try {
       const resolved = await resolveDriveSourceEntries(selected);
-      await generatePdf(resolved, paperFormat, "paper-minis");
+      const quantityById = new Map(
+        selected.map((entry) => [entry.id, entry.quantity]),
+      );
+      const resolvedForPrint: PrintableMiniFigEntry[] = resolved.map(
+        (entry) => ({
+          ...entry,
+          quantity: quantityById.get(entry.id) ?? 0,
+        }),
+      );
+      await generatePdf(
+        resolvedForPrint,
+        paperFormat,
+        "paper-minis",
+        printLayout,
+      );
     } catch (error) {
       const message = error instanceof Error
         ? error.message
@@ -861,7 +922,7 @@ function App() {
     }
   };
 
-  const oversizedCount = entries.filter(
+  const oversizedCount = printableEntries.filter(
     (entry) =>
       entry.quantity > 0 &&
       hasEntryImage(entry) &&
@@ -890,35 +951,39 @@ function App() {
           <h1>Paper Mini Foundry</h1>
           <p className="subtitle">Build a reusable creature binder, then compose a print sheet.</p>
         </div>
-        <nav className="view-tabs" aria-label="App sections">
-          <button className={view === "binder" ? "active" : ""} onClick={() => setView("binder")}>
-            Binder <span>{entries.length}</span>
-          </button>
-          <button className={view === "print" ? "active" : ""} onClick={() => setView("print")}>
-            Print <span>{selectedTotal}</span>
-          </button>
-          <button
-            className={`settings-tab${view === "settings" ? " active" : ""}`}
-            onClick={() => setView("settings")}
+        <Tabs
+          className="view-tabs"
+          value={view}
+          onChange={(_, nextView: AppView) => changeView(nextView)}
+          aria-label="App sections"
+        >
+          <Tab value="binder" label="Binder" />
+          <Tab
+            value="print"
+            label={<Badge badgeContent={selectedTotal} color="primary">Print</Badge>}
+          />
+          <Tab
+            value="settings"
+            className="settings-tab"
+            icon={
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path
+                  d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.74v.5a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"
+                />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            }
             aria-label="Settings"
-            title="Settings"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.75"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path
-                d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.74v.5a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"
-              />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-          </button>
-        </nav>
+          />
+        </Tabs>
       </header>
 
       {view !== "settings" && !driveAccessToken && driveSyncPanel}
@@ -947,8 +1012,9 @@ function App() {
             </div>
           )}
           <PrintBuilder
-            entries={entries}
+            entries={printableEntries}
             paperFormat={paperFormat}
+            printLayout={printLayout}
             generating={generating}
             exportError={exportError}
             onQuantityChange={setQuantity}
@@ -957,6 +1023,7 @@ function App() {
             onQuickAdd={() => openNavigationModal("quick-add")}
             onClearSelection={clearPrintSelection}
             onPaperFormatChange={handleSetPaperFormat}
+            onPrintLayoutChange={setPrintLayout}
             onGenerate={handleGenerate}
           />
         </main>
@@ -1002,14 +1069,26 @@ function App() {
 
       {activeModal === "quick-add" && (
         <QuickAddDialog
-          entries={entries}
+          entries={printableEntries}
           onAdd={(id) => {
-            const entry = entries.find((candidate) => candidate.id === id);
+            const entry = printableEntries.find((candidate) => candidate.id === id);
             if (entry) setQuantity(id, entry.quantity + 1);
           }}
           onClose={() => closeNavigationModal("quick-add")}
         />
       )}
+
+      <footer className="app-footer">
+        <span>Paper Mini Foundry is an open-source tabletop tool.</span>
+        <a
+          href="https://github.com/mathiasprisfeldt/paper-mini-fig-generator"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="View Paper Mini Fig Generator on GitHub"
+        >
+          View source on GitHub
+        </a>
+      </footer>
 
       {previewEntry && (
         <ExportPreviewDialog

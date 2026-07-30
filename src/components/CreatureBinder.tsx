@@ -252,7 +252,6 @@ export function CreatureBinder({
                     <CreatureThumbnail
                       className="creature-art"
                       entry={entry}
-                      showSelection
                       onPreview={onPreview}
                       onBlurHash={(id, blurHash) => onUpdate(id, { blurHash })}
                     />
