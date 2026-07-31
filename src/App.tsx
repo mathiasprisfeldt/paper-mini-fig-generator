@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Tab, Tabs } from "@mui/material";
+import { Alert, Tab, Tabs } from "@mui/material";
 import type {
   Catalogue,
   CreatureSource,
@@ -251,10 +251,6 @@ function App() {
       quantity: activePrintQuantities[entry.id] ?? 0,
     })),
     [activePrintQuantities, entries],
-  );
-  const selectedTotal = printableEntries.reduce(
-    (sum, entry) => sum + entry.quantity,
-    0,
   );
   const previewEntry =
     printableEntries.find((entry) => entry.id === previewId) ?? null;
@@ -1144,10 +1140,7 @@ function App() {
           aria-label="App sections"
         >
           <Tab value="binder" label="Binder" />
-          <Tab
-            value="print"
-            label={<Badge badgeContent={selectedTotal} color="primary">Print</Badge>}
-          />
+          <Tab value="print" label="Print" />
           <Tab
             value="settings"
             className="settings-tab"

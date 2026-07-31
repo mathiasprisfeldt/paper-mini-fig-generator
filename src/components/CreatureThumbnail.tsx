@@ -15,6 +15,7 @@ interface Props {
   imageLoading?: "eager" | "lazy";
   interactive?: boolean;
   showHint?: boolean;
+  loadedImageKeys?: Set<string>;
   onPreview?: (id: string) => void;
   onBlurHash?: (id: string, blurHash: string) => void;
 }
@@ -25,12 +26,15 @@ export function CreatureThumbnail({
   imageLoading = "lazy",
   interactive = true,
   showHint = true,
+  loadedImageKeys,
   onPreview,
   onBlurHash,
 }: Props) {
   const hasImage = Boolean(getEntryImageSource(entry) || entry.imageDriveFileId);
   const imageKey = getEntryImageSource(entry) || entry.imageDriveFileId || "";
-  const [loadedImageKey, setLoadedImageKey] = useState("");
+  const [loadedImageKey, setLoadedImageKey] = useState(() =>
+    loadedImageKeys?.has(imageKey) ? imageKey : "",
+  );
   const attemptedImageKeys = useRef(new Set<string>());
   const settledLayers = useRef(new Map<string, Set<"backdrop" | "foreground">>());
   const currentImageKey = useRef(imageKey);
@@ -46,7 +50,10 @@ export function CreatureThumbnail({
     };
   }, [imageKey]);
 
-  const isLoading = hasImage && loadedImageKey !== imageKey;
+  const isLoading =
+    hasImage &&
+    loadedImageKey !== imageKey &&
+    !loadedImageKeys?.has(imageKey);
   const blurPlaceholder = entry.blurHash
     ? blurHashToDataUrl(entry.blurHash)
     : null;
@@ -56,6 +63,7 @@ export function CreatureThumbnail({
     revealFrame.current = requestAnimationFrame(() => {
       revealFrame.current = requestAnimationFrame(() => {
         revealFrame.current = null;
+        loadedImageKeys?.add(loadedKey);
         setLoadedImageKey(loadedKey);
       });
     });

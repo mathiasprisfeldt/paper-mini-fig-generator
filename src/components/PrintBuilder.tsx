@@ -1,11 +1,9 @@
 import {
-  useCallback,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { useWindowVirtualizer } from "@tanstack/react-virtual";
+import { AutoSizer, List, WindowScroller } from "react-virtualized";
 import {
   Alert,
   Autocomplete,
@@ -20,6 +18,7 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
+  useMediaQuery,
 } from "@mui/material";
 import type {
   PaperFormat,
@@ -28,6 +27,7 @@ import type {
   PrintLayout,
 } from "../types";
 import { AppModal } from "./AppModal";
+import { CreatureSearch } from "./CreatureSearch";
 import { CreatureThumbnail } from "./CreatureThumbnail";
 
 interface CreateCatalogueOption {
@@ -36,13 +36,13 @@ interface CreateCatalogueOption {
 }
 
 type CatalogueOption = PrintCatalogue | CreateCatalogueOption;
+type PrintEntryFilter = "all" | "selected";
 
 const filterCatalogueOptions = createFilterOptions<CatalogueOption>({
   stringify: (option) => option.name,
 });
-const ESTIMATED_PRINT_ROW_HEIGHT = 84;
-const PRINT_ROW_GAP = 9;
-
+const PRINT_ROW_HEIGHT = 90;
+const MOBILE_PRINT_ROW_HEIGHT = 120;
 interface Props {
   entries: PrintableMiniFigEntry[];
   printCatalogues: PrintCatalogue[];
@@ -86,14 +86,17 @@ export function PrintBuilder({
   onRenamePrintCatalogue,
   onDeletePrintCatalogue,
 }: Props) {
+  const isMobile = useMediaQuery("(max-width: 640px)");
+  const printRowHeight = isMobile
+    ? MOBILE_PRINT_ROW_HEIGHT
+    : PRINT_ROW_HEIGHT;
   const [query, setQuery] = useState("");
+  const [entryFilter, setEntryFilter] = useState<PrintEntryFilter>("all");
   const [catalogueMenuAnchor, setCatalogueMenuAnchor] =
     useState<HTMLElement | null>(null);
   const [renamingCatalogue, setRenamingCatalogue] = useState(false);
   const [catalogueNameDraft, setCatalogueNameDraft] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
-  const printListRef = useRef<HTMLDivElement>(null);
-  const [printListScrollMargin, setPrintListScrollMargin] = useState(0);
   const total = entries.reduce((sum, entry) => sum + entry.quantity, 0);
   const selectedKinds = entries.filter((entry) => entry.quantity > 0).length;
   const activePrintCatalogue =
@@ -130,59 +133,40 @@ export function PrintBuilder({
   const visibleEntries = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return [...entries]
-      .filter((entry) => !normalized || entry.name.toLowerCase().includes(normalized))
+      .filter((entry) => {
+        const matchesQuery =
+          !normalized || entry.name.toLowerCase().includes(normalized);
+        const matchesSelection =
+          entryFilter === "all" || entry.quantity > 0;
+        return matchesQuery && matchesSelection;
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [entries, query]);
-  const printListVirtualizer = useWindowVirtualizer({
-    count: visibleEntries.length,
-    estimateSize: () => ESTIMATED_PRINT_ROW_HEIGHT,
-    gap: PRINT_ROW_GAP,
-    overscan: 10,
-    scrollMargin: printListScrollMargin,
-  });
-  const updatePrintListScrollMargin = useCallback(() => {
-    const list = printListRef.current;
-    if (!list) return;
-    const nextMargin = list.getBoundingClientRect().top + window.scrollY;
-    setPrintListScrollMargin((current) =>
-      current === nextMargin ? current : nextMargin
-    );
-  }, []);
-
-  useLayoutEffect(() => {
-    updatePrintListScrollMargin();
-  });
-
-  useLayoutEffect(() => {
-    const list = printListRef.current;
-    if (!list) return;
-    const resizeObserver = new ResizeObserver(updatePrintListScrollMargin);
-    resizeObserver.observe(list);
-    window.addEventListener("resize", updatePrintListScrollMargin);
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener("resize", updatePrintListScrollMargin);
-    };
-  }, [updatePrintListScrollMargin]);
-
-  useLayoutEffect(() => {
-    printListVirtualizer.measure();
-  }, [printListVirtualizer, visibleEntries.length]);
-
+  }, [entries, entryFilter, query]);
   return (
     <div className="print-layout">
       <section className="print-picker">
         <div className="section-toolbar">
           <div className="print-toolbar-actions">
-            <TextField
-              className="search-input print-search-input"
-              type="search"
-              size="small"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search creatures…"
-              slotProps={{ htmlInput: { "aria-label": "Search print creatures" } }}
+            <CreatureSearch
+              query={query}
+              onQueryChange={setQuery}
+              searchAriaLabel="Search print creatures"
             />
+            <ToggleButton
+              className="print-selected-toggle"
+              value="selected"
+              selected={entryFilter === "selected"}
+              onClick={() =>
+                setEntryFilter((current) =>
+                  current === "selected" ? "all" : "selected"
+                )
+              }
+              color="primary"
+              size="small"
+              aria-label="Show selected creatures only"
+            >
+              Selected creatures ({selectedKinds})
+            </ToggleButton>
             <Button
               variant="outlined"
               type="button"
@@ -191,37 +175,31 @@ export function PrintBuilder({
             >
               Quick add
             </Button>
-            <Button
-              variant="outlined"
-              type="button"
-              onClick={onClearSelection}
-              disabled={total === 0}
-            >
-              Clear selection
-            </Button>
           </div>
         </div>
 
         {visibleEntries.length > 0 ? (
-          <div
-            ref={printListRef}
-            className="print-creature-list print-creature-list-virtual"
-            style={{ height: printListVirtualizer.getTotalSize() }}
-          >
-            {printListVirtualizer.getVirtualItems().map((virtualRow) => {
-              const entry = visibleEntries[virtualRow.index];
-              return (
-                <article
-                  ref={printListVirtualizer.measureElement}
-                  className={`print-creature-row${entry.quantity ? " selected" : ""}`}
-                  data-index={virtualRow.index}
-                  key={entry.id}
-                  style={{
-                    transform: `translateY(${
-                      virtualRow.start - printListScrollMargin
-                    }px)`,
-                  }}
-                >
+          <WindowScroller>
+            {({ height, isScrolling, onChildScroll, scrollTop }) => (
+              <AutoSizer disableHeight>
+                {({ width }) => (
+                  <List
+                      autoHeight
+                      className="print-creature-list"
+                      height={height}
+                      isScrolling={isScrolling}
+                      onScroll={onChildScroll}
+                      overscanRowCount={8}
+                      rowCount={visibleEntries.length}
+                      rowHeight={printRowHeight}
+                      rowRenderer={({ index, key, style }) => {
+                        const entry = visibleEntries[index];
+                        return (
+                  <article
+                    className={`print-creature-row${entry.quantity ? " selected" : ""}`}
+                    key={key}
+                    style={style}
+                  >
                   <CreatureThumbnail
                     className="print-creature-thumbnail"
                     entry={entry}
@@ -274,18 +252,32 @@ export function PrintBuilder({
                       +
                     </Button>
                   </ButtonGroup>
-                </article>
-              );
-            })}
-          </div>
+                  </article>
+                        );
+                      }}
+                      scrollTop={scrollTop}
+                      width={width}
+                    />
+                )}
+              </AutoSizer>
+            )}
+          </WindowScroller>
         ) : entries.length === 0 ? (
           <div className="empty-state compact">
             <h3>Add creatures to your binder first</h3>
           </div>
         ) : (
           <div className="empty-state compact">
-            <h3>No matching creatures</h3>
-            <p>Try another search.</p>
+            <h3>
+              {entryFilter === "selected"
+                ? "No selected creatures"
+                : "No matching creatures"}
+            </h3>
+            <p>
+              {entryFilter === "selected"
+                ? "Select creatures by increasing their quantity."
+                : "Try another search."}
+            </p>
           </div>
         )}
       </section>
@@ -479,7 +471,22 @@ export function PrintBuilder({
           )}
         </section>
         <section className="print-summary">
-        <span className="eyebrow">Export</span>
+        <div className="print-summary-heading">
+          <span className="eyebrow">Export</span>
+          <IconButton
+            className="clear-selection-button"
+            size="small"
+            aria-label="Clear selection"
+            title="Clear selection"
+            onClick={onClearSelection}
+            disabled={total === 0}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 11a8 8 0 1 1-2.34-5.66L20 8" />
+              <path d="M20 4v4h-4" />
+            </svg>
+          </IconButton>
+        </div>
         <div className="summary-stat">
           <strong>{total}</strong>
           <span>miniature{total === 1 ? "" : "s"}</span>

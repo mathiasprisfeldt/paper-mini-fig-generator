@@ -991,12 +991,10 @@
   font-size: 0.8rem;
 }
 
-.search-input {
+.creature-search {
   width: min(280px, 45vw);
-}
-
-.source-filter {
-  width: min(210px, 28vw);
+  flex-shrink: 0;
+  margin-right: auto;
 }
 
 .binder-toolbar-actions {
@@ -1004,10 +1002,6 @@
   align-items: center;
   width: 100%;
   gap: 0.55rem;
-}
-
-.binder-toolbar-actions .source-filter {
-  margin-right: auto;
 }
 
 .source-button-group {
@@ -1084,25 +1078,22 @@
 }
 
 .quick-add-results {
-  max-height: min(52vh, 430px);
-  padding: 0.2rem;
-  overflow-y: auto;
+  height: min(52vh, 430px);
+  width: calc(100% + 2.6rem);
+  margin-inline: -1.3rem;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
-.quick-add-results-virtual {
-  position: relative;
-  width: 100%;
-}
-
-.quick-add-result {
+.quick-add-result.MuiButtonBase-root {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.7rem;
   width: 100%;
-  padding: 0.45rem;
+  padding: 0.45rem 1.75rem;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   color: var(--text);
   background: transparent;
   cursor: pointer;
@@ -1180,15 +1171,14 @@
   gap: 1rem;
 }
 
-.creature-grid-virtual {
-  position: relative;
-  width: 100%;
+.binder-virtual-row {
+  align-items: start;
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
-.creature-grid-row {
-  position: absolute;
-  top: 0;
-  left: 0;
+.binder-virtual-list {
+  min-width: 0;
   width: 100%;
 }
 
@@ -1554,15 +1544,133 @@
   padding: 0.9rem;
 }
 
+.binder-creature-name {
+  width: 100%;
+  min-width: 0;
+  padding: 0.25rem 0 0.35rem;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  outline: 0;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.binder-creature-name:focus {
+  border-bottom-color: var(--accent);
+  box-shadow: 0 1px 0 var(--accent);
+}
+
 .creature-settings {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.6rem;
 }
 
+.binder-card-select {
+  position: relative;
+  min-width: 0;
+}
+
+.binder-card-select > span {
+  position: absolute;
+  z-index: 1;
+  top: -0.42rem;
+  left: 0.65rem;
+  padding-inline: 0.22rem;
+  color: var(--text-muted);
+  background: var(--surface);
+  font-size: 0.72rem;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.binder-card-select select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: 0;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.binder-card-select select:focus {
+  border-color: var(--accent);
+}
+
+.binder-card-checkbox {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.binder-card-checkbox input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 .creature-card-actions {
   display: flex;
   gap: 0.5rem;
+}
+
+.binder-remove-button {
+  padding: 0.35rem 0.7rem;
+  color: #f87171;
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.binder-remove-button:hover,
+.binder-remove-button:focus-visible {
+  color: white;
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.binder-card-placeholder {
+  min-height: 390px;
+}
+
+.binder-placeholder-art {
+  height: 210px;
+  background: var(--bg);
+}
+
+.binder-placeholder-body {
+  display: grid;
+  gap: 0.9rem;
+  padding: 0.9rem;
+}
+
+.binder-placeholder-body strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.binder-placeholder-controls {
+  height: 2.35rem;
+  background: var(--surface-hover);
+  border-radius: var(--radius-sm);
 }
 
 .btn-danger-ghost {
@@ -1766,27 +1874,17 @@
   border-radius: var(--radius);
 }
 
-.print-creature-list {
-  display: grid;
-  gap: 0.55rem;
+.creature-search-filter-button svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2;
 }
 
-.print-creature-list-virtual {
-  position: relative;
-  display: block;
-  width: 100%;
-}
-
-.print-creature-list-virtual .print-creature-row {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-}
-
-.print-search-input {
+.print-selected-toggle {
   flex-shrink: 0;
-  margin-right: auto;
 }
 
 .print-toolbar-actions {
@@ -1872,6 +1970,22 @@
   align-items: baseline;
   gap: 0.5rem;
   margin-top: 1.25rem;
+}
+
+.print-summary-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.clear-selection-button svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .summary-stat strong {
@@ -2222,14 +2336,8 @@
     grid-column: auto;
   }
 
-  .search-input {
+  .creature-search {
     width: 100%;
-  }
-
-  .source-filter {
-    grid-column: 1 / -1;
-    width: 100%;
-    margin-right: 0;
   }
 
   .binder-toolbar-actions {
@@ -2238,17 +2346,13 @@
     width: 100%;
   }
 
-  .binder-toolbar-actions .search-input {
-    grid-column: 1 / -1;
-  }
-
   .print-toolbar-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
     width: 100%;
   }
 
-  .print-toolbar-actions .print-search-input {
+  .creature-search {
     grid-column: 1 / -1;
     margin-right: 0;
   }

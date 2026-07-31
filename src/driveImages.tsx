@@ -14,6 +14,7 @@ import { downloadDriveImageBlob, DriveAuthError } from "./googleDrive";
 import type { MiniFigEntry } from "./types";
 
 interface DriveImageContextValue {
+  getCached: (fileId: string) => string | null;
   load: (fileId: string) => Promise<string>;
 }
 
@@ -25,49 +26,58 @@ interface ProviderProps {
 }
 
 export function DriveImageProvider({ accessToken, children }: ProviderProps) {
-  const cacheRef = useRef(new Map<string, Promise<string>>());
-  const objectUrlsRef = useRef(new Set<string>());
+  const cacheState = useMemo(() => ({
+    accessToken,
+    requests: new Map<string, Promise<string>>(),
+    resolvedUrls: new Map<string, string>(),
+    objectUrls: new Set<string>(),
+  }), [accessToken]);
 
   useEffect(() => {
-    const cache = cacheRef.current;
-    const objectUrls = objectUrlsRef.current;
     return () => {
-      for (const url of objectUrls) URL.revokeObjectURL(url);
-      objectUrls.clear();
-      cache.clear();
+      for (const url of cacheState.objectUrls) URL.revokeObjectURL(url);
+      cacheState.objectUrls.clear();
+      cacheState.resolvedUrls.clear();
+      cacheState.requests.clear();
     };
-  }, [accessToken]);
+  }, [cacheState]);
+
+  const getCached = useCallback(
+    (fileId: string) => cacheState.resolvedUrls.get(fileId) ?? null,
+    [cacheState],
+  );
 
   const load = useCallback((fileId: string): Promise<string> => {
-    if (!accessToken) {
+    if (!cacheState.accessToken) {
       return Promise.reject(
         new DriveAuthError("Connect Google Drive to load this image."),
       );
     }
 
-    const cached = cacheRef.current.get(fileId);
+    const cached = cacheState.requests.get(fileId);
     if (cached) return cached;
 
-    const request = downloadDriveImageBlob(accessToken, fileId)
+    const request = downloadDriveImageBlob(cacheState.accessToken, fileId)
       .then((blob) => {
-        if (cacheRef.current.get(fileId) !== request) {
+        if (cacheState.requests.get(fileId) !== request) {
           throw new Error("Drive image request was superseded.");
         }
         const url = URL.createObjectURL(blob);
-        objectUrlsRef.current.add(url);
+        cacheState.objectUrls.add(url);
+        cacheState.resolvedUrls.set(fileId, url);
         return url;
       })
       .catch((error) => {
-        if (cacheRef.current.get(fileId) === request) {
-          cacheRef.current.delete(fileId);
+        if (cacheState.requests.get(fileId) === request) {
+          cacheState.requests.delete(fileId);
         }
         throw error;
       });
-    cacheRef.current.set(fileId, request);
+    cacheState.requests.set(fileId, request);
     return request;
-  }, [accessToken]);
+  }, [cacheState]);
 
-  const value = useMemo(() => ({ load }), [load]);
+  const value = useMemo(() => ({ getCached, load }), [getCached, load]);
   return (
     <DriveImageContext.Provider value={value}>
       {children}
@@ -87,7 +97,13 @@ function useLazyEntryImageSource(
     fileId: string;
     loader: DriveImageContextValue["load"];
     url: string;
-  } | null>(null);
+  } | null>(() => {
+    if (!entry.imageDriveFileId || !context) return null;
+    const url = context.getCached(entry.imageDriveFileId);
+    return url
+      ? { fileId: entry.imageDriveFileId, loader: context.load, url }
+      : null;
+  });
 
   useEffect(() => {
     if (directSource || !entry.imageDriveFileId || eager) return;
