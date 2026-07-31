@@ -216,6 +216,16 @@ export function CreatureBinder({
               ))}
             </Select>
           </FormControl>
+          {activeSourceFilter !== ALL_SOURCES && (
+            <Button
+              variant="text"
+              size="small"
+              type="button"
+              onClick={() => onSourceFilterChange(null)}
+            >
+              Clear filter
+            </Button>
+          )}
           <div className="source-button-group">
             <Button
               variant="outlined"

@@ -13,10 +13,12 @@ import {
   ButtonGroup,
   CircularProgress,
   createFilterOptions,
+  FormControl,
   IconButton,
   InputBase,
   Menu,
   MenuItem,
+  Select,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -36,6 +38,7 @@ interface CreateCatalogueOption {
 }
 
 type CatalogueOption = PrintCatalogue | CreateCatalogueOption;
+type PrintEntryFilter = "all" | "selected";
 
 const filterCatalogueOptions = createFilterOptions<CatalogueOption>({
   stringify: (option) => option.name,
@@ -87,6 +90,7 @@ export function PrintBuilder({
   onDeletePrintCatalogue,
 }: Props) {
   const [query, setQuery] = useState("");
+  const [entryFilter, setEntryFilter] = useState<PrintEntryFilter>("all");
   const [catalogueMenuAnchor, setCatalogueMenuAnchor] =
     useState<HTMLElement | null>(null);
   const [renamingCatalogue, setRenamingCatalogue] = useState(false);
@@ -130,9 +134,15 @@ export function PrintBuilder({
   const visibleEntries = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return [...entries]
-      .filter((entry) => !normalized || entry.name.toLowerCase().includes(normalized))
+      .filter((entry) => {
+        const matchesQuery =
+          !normalized || entry.name.toLowerCase().includes(normalized);
+        const matchesSelection =
+          entryFilter === "all" || entry.quantity > 0;
+        return matchesQuery && matchesSelection;
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [entries, query]);
+  }, [entries, entryFilter, query]);
   const printListVirtualizer = useWindowVirtualizer({
     count: visibleEntries.length,
     estimateSize: () => ESTIMATED_PRINT_ROW_HEIGHT,
@@ -183,6 +193,30 @@ export function PrintBuilder({
               placeholder="Search creatures…"
               slotProps={{ htmlInput: { "aria-label": "Search print creatures" } }}
             />
+            <FormControl className="print-filter" size="small">
+              <Select
+                value={entryFilter}
+                onChange={(event) =>
+                  setEntryFilter(event.target.value as PrintEntryFilter)
+                }
+                inputProps={{ "aria-label": "Filter print creatures" }}
+              >
+                <MenuItem value="all">All creatures ({entries.length})</MenuItem>
+                <MenuItem value="selected">
+                  Selected creatures ({selectedKinds})
+                </MenuItem>
+              </Select>
+            </FormControl>
+            {entryFilter !== "all" && (
+              <Button
+                variant="text"
+                size="small"
+                type="button"
+                onClick={() => setEntryFilter("all")}
+              >
+                Clear filter
+              </Button>
+            )}
             <Button
               variant="outlined"
               type="button"
@@ -284,8 +318,16 @@ export function PrintBuilder({
           </div>
         ) : (
           <div className="empty-state compact">
-            <h3>No matching creatures</h3>
-            <p>Try another search.</p>
+            <h3>
+              {entryFilter === "selected"
+                ? "No selected creatures"
+                : "No matching creatures"}
+            </h3>
+            <p>
+              {entryFilter === "selected"
+                ? "Select creatures by increasing their quantity."
+                : "Try another search."}
+            </p>
           </div>
         )}
       </section>

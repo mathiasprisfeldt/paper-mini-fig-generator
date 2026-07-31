@@ -1789,6 +1789,10 @@
   margin-right: auto;
 }
 
+.print-filter {
+  width: min(210px, 28vw);
+}
+
 .print-toolbar-actions {
   display: flex;
   align-items: center;
@@ -2251,6 +2255,11 @@
   .print-toolbar-actions .print-search-input {
     grid-column: 1 / -1;
     margin-right: 0;
+  }
+
+  .print-filter {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 
   .source-form {
