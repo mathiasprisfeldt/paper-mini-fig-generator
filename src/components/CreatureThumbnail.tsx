@@ -11,6 +11,7 @@ import type { MiniFigEntry } from "../types";
 interface Props {
   entry: MiniFigEntry;
   className?: string;
+  imageLoading?: "eager" | "lazy";
   showHint?: boolean;
   onPreview: (id: string) => void;
   onBlurHash?: (id: string, blurHash: string) => void;
@@ -19,6 +20,7 @@ interface Props {
 export function CreatureThumbnail({
   entry,
   className = "",
+  imageLoading = "lazy",
   showHint = true,
   onPreview,
   onBlurHash,
@@ -109,7 +111,7 @@ export function CreatureThumbnail({
             alt=""
             aria-hidden="true"
             decoding="async"
-            loading="lazy"
+            loading={imageLoading}
             onLoad={() => settleLayer(imageKey, "backdrop")}
             onError={() => settleLayer(imageKey, "backdrop")}
           />
@@ -118,7 +120,7 @@ export function CreatureThumbnail({
             className="creature-art-foreground"
             alt=""
             decoding="async"
-            loading="lazy"
+            loading={imageLoading}
             onLoad={(event) => void handleImageLoad(event.currentTarget)}
             onError={() => settleLayer(imageKey, "foreground")}
           />

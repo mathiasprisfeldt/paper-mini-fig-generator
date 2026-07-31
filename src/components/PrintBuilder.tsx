@@ -1,4 +1,11 @@
-import { useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import {
   Autocomplete,
   createFilterOptions,
@@ -28,6 +35,8 @@ type CatalogueOption = PrintCatalogue | CreateCatalogueOption;
 const filterCatalogueOptions = createFilterOptions<CatalogueOption>({
   stringify: (option) => option.name,
 });
+const ESTIMATED_PRINT_ROW_HEIGHT = 84;
+const PRINT_ROW_GAP = 9;
 
 interface Props {
   entries: PrintableMiniFigEntry[];
@@ -78,6 +87,8 @@ export function PrintBuilder({
   const [renamingCatalogue, setRenamingCatalogue] = useState(false);
   const [catalogueNameDraft, setCatalogueNameDraft] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const printListRef = useRef<HTMLDivElement>(null);
+  const [printListScrollMargin, setPrintListScrollMargin] = useState(0);
   const total = entries.reduce((sum, entry) => sum + entry.quantity, 0);
   const selectedKinds = entries.filter((entry) => entry.quantity > 0).length;
   const activePrintCatalogue =
@@ -117,6 +128,42 @@ export function PrintBuilder({
       .filter((entry) => !normalized || entry.name.toLowerCase().includes(normalized))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [entries, query]);
+  const printListVirtualizer = useWindowVirtualizer({
+    count: visibleEntries.length,
+    estimateSize: () => ESTIMATED_PRINT_ROW_HEIGHT,
+    gap: PRINT_ROW_GAP,
+    overscan: 10,
+    scrollMargin: printListScrollMargin,
+  });
+  const updatePrintListScrollMargin = useCallback(() => {
+    const list = printListRef.current;
+    if (!list) return;
+    const nextMargin = list.getBoundingClientRect().top + window.scrollY;
+    setPrintListScrollMargin((current) =>
+      current === nextMargin ? current : nextMargin
+    );
+  }, []);
+
+  useLayoutEffect(() => {
+    updatePrintListScrollMargin();
+  });
+
+  useLayoutEffect(() => {
+    const list = printListRef.current;
+    if (!list) return;
+    const resizeObserver = new ResizeObserver(updatePrintListScrollMargin);
+    resizeObserver.observe(list);
+    window.addEventListener("resize", updatePrintListScrollMargin);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updatePrintListScrollMargin);
+    };
+  }, [updatePrintListScrollMargin]);
+
+  useLayoutEffect(() => {
+    printListVirtualizer.measure();
+  }, [printListVirtualizer, visibleEntries.length]);
+
   return (
     <div className="print-layout">
       <section className="print-picker">
@@ -150,52 +197,70 @@ export function PrintBuilder({
         </div>
 
         {visibleEntries.length > 0 ? (
-          <div className="print-creature-list">
-            {visibleEntries.map((entry) => (
-              <article className={`print-creature-row${entry.quantity ? " selected" : ""}`} key={entry.id}>
-                <CreatureThumbnail
-                  className="print-creature-thumbnail"
-                  entry={entry}
-                  showHint={false}
-                  onPreview={onPreview}
-                  onBlurHash={onBlurHash}
-                />
-                <div className="print-creature-info">
-                  <strong>{entry.name || "Unnamed creature"}</strong>
-                  <span>{entry.creatureSize} · {entry.miniSize}mm</span>
-                </div>
-                <div className="quantity-stepper" aria-label={`${entry.name} quantity`}>
-                  <button
-                    type="button"
-                    aria-label={`Decrease ${entry.name || "unnamed creature"} quantity`}
-                    onClick={() => onQuantityChange(entry.id, entry.quantity - 1)}
-                    disabled={entry.quantity === 0}
-                  >
-                    −
-                  </button>
-                  <input
-                    type="number"
-                    aria-label={`${entry.name || "Unnamed creature"} quantity`}
-                    min={0}
-                    max={99}
-                    value={entry.quantity}
-                    onChange={(event) => {
-                      if (event.target.value !== "") {
-                        onQuantityChange(entry.id, Number(event.target.value));
-                      }
-                    }}
+          <div
+            ref={printListRef}
+            className="print-creature-list print-creature-list-virtual"
+            style={{ height: printListVirtualizer.getTotalSize() }}
+          >
+            {printListVirtualizer.getVirtualItems().map((virtualRow) => {
+              const entry = visibleEntries[virtualRow.index];
+              return (
+                <article
+                  ref={printListVirtualizer.measureElement}
+                  className={`print-creature-row${entry.quantity ? " selected" : ""}`}
+                  data-index={virtualRow.index}
+                  key={entry.id}
+                  style={{
+                    transform: `translateY(${
+                      virtualRow.start - printListScrollMargin
+                    }px)`,
+                  }}
+                >
+                  <CreatureThumbnail
+                    className="print-creature-thumbnail"
+                    entry={entry}
+                    imageLoading="eager"
+                    showHint={false}
+                    onPreview={onPreview}
+                    onBlurHash={onBlurHash}
                   />
-                  <button
-                    type="button"
-                    aria-label={`Increase ${entry.name || "unnamed creature"} quantity`}
-                    onClick={() => onQuantityChange(entry.id, entry.quantity + 1)}
-                    disabled={entry.quantity >= 99}
-                  >
-                    +
-                  </button>
-                </div>
-              </article>
-            ))}
+                  <div className="print-creature-info">
+                    <strong>{entry.name || "Unnamed creature"}</strong>
+                    <span>{entry.creatureSize} · {entry.miniSize}mm</span>
+                  </div>
+                  <div className="quantity-stepper" aria-label={`${entry.name} quantity`}>
+                    <button
+                      type="button"
+                      aria-label={`Decrease ${entry.name || "unnamed creature"} quantity`}
+                      onClick={() => onQuantityChange(entry.id, entry.quantity - 1)}
+                      disabled={entry.quantity === 0}
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      aria-label={`${entry.name || "Unnamed creature"} quantity`}
+                      min={0}
+                      max={99}
+                      value={entry.quantity}
+                      onChange={(event) => {
+                        if (event.target.value !== "") {
+                          onQuantityChange(entry.id, Number(event.target.value));
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      aria-label={`Increase ${entry.name || "unnamed creature"} quantity`}
+                      onClick={() => onQuantityChange(entry.id, entry.quantity + 1)}
+                      disabled={entry.quantity >= 99}
+                    >
+                      +
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         ) : entries.length === 0 ? (
           <div className="empty-state compact">
