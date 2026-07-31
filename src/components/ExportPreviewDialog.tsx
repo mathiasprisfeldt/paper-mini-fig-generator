@@ -5,7 +5,7 @@ import {
   type KeyboardEvent,
   type PointerEvent,
 } from "react";
-import { FormControlLabel, Radio, RadioGroup } from "@mui/material";
+import { Alert, FormControlLabel, Radio, RadioGroup } from "@mui/material";
 import { getEffectiveWidthMm, renderPreview } from "../generatePdf";
 import type { MiniFigEntry, PrintableMiniFigEntry } from "../types";
 import { AppModal } from "./AppModal";
@@ -128,7 +128,7 @@ export function ExportPreviewDialog({ entry, resolveEntry, onClose }: Props) {
           {(!previewUrl || (mode === "folded" && previewAspect === null)) && !error && (
             <div className="preview-loading">Rendering preview…</div>
           )}
-          {error && <p className="form-error">{error}</p>}
+          {error && <Alert severity="error">{error}</Alert>}
           {previewUrl && mode === "layout" && (
             <img src={previewUrl} alt={`Foldable export layout for ${entry.name || "this creature"}`} />
           )}

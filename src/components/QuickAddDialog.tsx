@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import { DriveCreatureImage } from "../driveImages";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { ButtonBase, TextField } from "@mui/material";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type { PrintableMiniFigEntry } from "../types";
 import { AppModal } from "./AppModal";
+import { CreatureThumbnail } from "./CreatureThumbnail";
 
 interface Props {
   entries: PrintableMiniFigEntry[];
@@ -9,10 +11,15 @@ interface Props {
   onClose: () => void;
 }
 
+const ESTIMATED_RESULT_HEIGHT = 64;
+const RESULT_GAP = 6;
+
 export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
+  const [resultsElement, setResultsElement] = useState<HTMLDivElement | null>(null);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [announcement, setAnnouncement] = useState("");
+  const [activeDescendantId, setActiveDescendantId] = useState<string>();
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return [...entries]
@@ -23,13 +30,37 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
     ? Math.min(selectedIndex, results.length - 1)
     : 0;
   const activeEntry = results[activeIndex];
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual is the established list virtualizer in this app.
+  const resultVirtualizer = useVirtualizer({
+    count: results.length,
+    getScrollElement: () => resultsElement,
+    estimateSize: () => ESTIMATED_RESULT_HEIGHT,
+    gap: RESULT_GAP,
+    overscan: 6,
+    getItemKey: (index) => results[index]?.id ?? index,
+  });
+  const virtualResults = resultVirtualizer.getVirtualItems();
+  const activeOptionId = activeEntry ? `quick-add-${activeEntry.id}` : undefined;
+  const activeOptionMounted = virtualResults.some(
+    (virtualResult) => virtualResult.index === activeIndex,
+  );
+
+  useLayoutEffect(() => {
+    resultVirtualizer.measure();
+  }, [resultVirtualizer, results.length]);
+
+  useLayoutEffect(() => {
+    if (!activeOptionId) {
+      setActiveDescendantId(undefined);
+    } else if (activeOptionMounted) {
+      setActiveDescendantId(activeOptionId);
+    }
+  }, [activeOptionId, activeOptionMounted]);
 
   useEffect(() => {
     if (!activeEntry) return;
-    document.getElementById(`quick-add-${activeEntry.id}`)?.scrollIntoView({
-      block: "nearest",
-    });
-  }, [activeEntry]);
+    resultVirtualizer.scrollToIndex(activeIndex, { align: "auto" });
+  }, [activeEntry, activeIndex, resultVirtualizer]);
 
   const addCreature = (entry: PrintableMiniFigEntry) => {
     onAdd(entry.id);
@@ -88,7 +119,7 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
           </div>
         </header>
 
-        <input
+        <TextField
           className="quick-add-search"
           type="search"
           value={query}
@@ -98,13 +129,24 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
             setAnnouncement("");
           }}
           placeholder="Search creatures…"
-          role="combobox"
-          aria-label="Search creatures to add"
-          aria-expanded="true"
-          aria-autocomplete="list"
-          aria-controls="quick-add-results"
-          aria-activedescendant={activeEntry ? `quick-add-${activeEntry.id}` : undefined}
+          fullWidth
           autoFocus
+          sx={{
+            "& .MuiOutlinedInput-input": {
+              padding: "0.78rem 0.9rem",
+              fontSize: "1rem",
+            },
+          }}
+          slotProps={{
+            htmlInput: {
+              role: "combobox",
+              "aria-label": "Search creatures to add",
+              "aria-expanded": "true",
+              "aria-autocomplete": "list",
+              "aria-controls": "quick-add-results",
+              "aria-activedescendant": activeDescendantId,
+            },
+          }}
         />
 
         <div className="quick-add-shortcuts" aria-hidden="true">
@@ -113,29 +155,64 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
           <span><kbd>Esc</kbd> clear / close</span>
         </div>
 
-        <div className="quick-add-results" id="quick-add-results" role="listbox">
-          {results.length ? results.map((entry, index) => (
-            <button
-              id={`quick-add-${entry.id}`}
-              className={`quick-add-result${index === activeIndex ? " active" : ""}`}
-              type="button"
-              role="option"
-              aria-selected={index === activeIndex}
-              key={entry.id}
-              onMouseEnter={() => setSelectedIndex(index)}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => addCreature(entry)}
+        <div
+          ref={setResultsElement}
+          className="quick-add-results"
+          id="quick-add-results"
+          role="listbox"
+        >
+          {results.length ? (
+            <div
+              className="quick-add-results-virtual"
+              role="presentation"
+              style={{ height: resultVirtualizer.getTotalSize() }}
             >
-              <DriveCreatureImage entry={entry} alt="" />
-              <span className="quick-add-result-copy">
-                <strong>{entry.name || "Unnamed creature"}</strong>
-                <small>{entry.creatureSize} · {entry.miniSize}mm</small>
-              </span>
-              <span className="quick-add-count">
-                {entry.quantity ? `${entry.quantity} selected` : "Add"}
-              </span>
-            </button>
-          )) : (
+              {virtualResults.map((virtualResult) => {
+                const entry = results[virtualResult.index];
+                const index = virtualResult.index;
+                return (
+                  <ButtonBase
+                    ref={resultVirtualizer.measureElement}
+                    id={`quick-add-${entry.id}`}
+                    className={`quick-add-result${index === activeIndex ? " active" : ""}`}
+                    component="button"
+                    type="button"
+                    role="option"
+                    aria-selected={index === activeIndex}
+                    aria-posinset={index + 1}
+                    aria-setsize={results.length}
+                    data-index={index}
+                    key={entry.id}
+                    onMouseEnter={() => setSelectedIndex(index)}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => addCreature(entry)}
+                    sx={{
+                      display: "grid",
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      transform: `translateY(${virtualResult.start}px)`,
+                    }}
+                  >
+                    <CreatureThumbnail
+                      className="quick-add-thumbnail"
+                      entry={entry}
+                      imageLoading="eager"
+                      interactive={false}
+                      showHint={false}
+                    />
+                    <span className="quick-add-result-copy">
+                      <strong>{entry.name || "Unnamed creature"}</strong>
+                      <small>{entry.creatureSize} · {entry.miniSize}mm</small>
+                    </span>
+                    <span className="quick-add-count">
+                      {entry.quantity ? `${entry.quantity} selected` : "Add"}
+                    </span>
+                  </ButtonBase>
+                );
+              })}
+            </div>
+          ) : (
             <div className="quick-add-empty">
               <strong>No matching creatures</strong>
               <span>Try another search.</span>

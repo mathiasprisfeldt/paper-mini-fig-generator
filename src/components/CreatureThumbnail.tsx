@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Box, ButtonBase } from "@mui/material";
 import {
   blurHashToDataUrl,
   createBlurHash,
@@ -12,8 +13,9 @@ interface Props {
   entry: MiniFigEntry;
   className?: string;
   imageLoading?: "eager" | "lazy";
+  interactive?: boolean;
   showHint?: boolean;
-  onPreview: (id: string) => void;
+  onPreview?: (id: string) => void;
   onBlurHash?: (id: string, blurHash: string) => void;
 }
 
@@ -21,6 +23,7 @@ export function CreatureThumbnail({
   entry,
   className = "",
   imageLoading = "lazy",
+  interactive = true,
   showHint = true,
   onPreview,
   onBlurHash,
@@ -84,14 +87,8 @@ export function CreatureThumbnail({
     }
   };
 
-  return (
-    <button
-      className={`creature-thumbnail creature-preview-trigger${isLoading ? " is-loading" : ""} ${className}`.trim()}
-      type="button"
-      onClick={() => onPreview(entry.id)}
-      aria-label={`Preview ${entry.name || "creature"} export`}
-      aria-busy={isLoading || undefined}
-    >
+  const content = (
+    <>
       {hasImage ? (
         <>
           <span
@@ -131,6 +128,32 @@ export function CreatureThumbnail({
       {showHint && (
         <span className="preview-hint" aria-hidden="true">Preview print</span>
       )}
-    </button>
+    </>
+  );
+  const rootClassName =
+    `creature-thumbnail${interactive ? " creature-preview-trigger" : ""}${isLoading ? " is-loading" : ""} ${className}`.trim();
+
+  if (!interactive) {
+    return (
+      <Box
+        component="span"
+        className={rootClassName}
+        aria-busy={isLoading || undefined}
+      >
+        {content}
+      </Box>
+    );
+  }
+
+  return (
+    <ButtonBase
+      className={rootClassName}
+      component="button"
+      onClick={() => onPreview?.(entry.id)}
+      aria-label={`Preview ${entry.name || "creature"} export`}
+      aria-busy={isLoading || undefined}
+    >
+      {content}
+    </ButtonBase>
   );
 }

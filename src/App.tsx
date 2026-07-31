@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Tab, Tabs } from "@mui/material";
+import { Alert, Badge, Tab, Tabs } from "@mui/material";
 import type {
   Catalogue,
   CreatureSource,
@@ -1192,10 +1192,9 @@ function App() {
       ) : view === "print" ? (
         <main>
           {oversizedCount > 0 && (
-            <div className="oversized-notice">
-              <span>⚠️</span>
-              <span>{oversizedCount} selected creature{oversizedCount === 1 ? " is" : "s are"} wider than {activePaperFormat.toUpperCase()}.</span>
-            </div>
+            <Alert className="oversized-notice" severity="warning">
+              {oversizedCount} selected creature{oversizedCount === 1 ? " is" : "s are"} wider than {activePaperFormat.toUpperCase()}.
+            </Alert>
           )}
           <PrintBuilder
             entries={printableEntries}

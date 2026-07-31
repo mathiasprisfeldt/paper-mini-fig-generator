@@ -455,34 +455,6 @@
   color: var(--border);
 }
 
-.format-picker {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.format-btn {
-  padding: 0.2rem 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.format-btn:hover {
-  border-color: var(--accent);
-  color: var(--text);
-}
-
-.format-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
-}
-
 .oversized-notice {
   display: flex;
   align-items: flex-start;
@@ -756,6 +728,19 @@
   font-weight: 600;
 }
 
+.source-tabs .MuiToggleButton-root {
+  margin: 0 !important;
+  padding: 0.42rem 0.75rem;
+  border: 0 !important;
+  border-radius: 999px !important;
+}
+
+.source-tabs .MuiToggleButton-root.Mui-selected,
+.source-tabs .MuiToggleButton-root.Mui-selected:hover {
+  color: white;
+  background: var(--accent);
+}
+
 .view-tabs button {
   position: relative;
   z-index: 1;
@@ -784,13 +769,8 @@
   height: 1.05rem;
 }
 
-.view-tabs button.Mui-selected,
-.source-tabs button.active {
+.view-tabs button.Mui-selected {
   color: white;
-}
-
-.source-tabs button.active {
-  background: var(--accent);
 }
 
 .source-tabs button.requires-drive {
@@ -904,15 +884,13 @@
   gap: 0.8rem;
 }
 
-.form-control,
-.creature-settings label {
+.form-control {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
 }
 
 .form-control > span,
-.creature-settings label > span,
 .paper-format-control > span {
   color: var(--text-muted);
   font-size: 0.68rem;
@@ -922,12 +900,7 @@
 }
 
 .form-control input,
-.form-control select,
-.creature-name-input,
-.creature-settings select,
-.search-input,
-.source-filter,
-.quantity-stepper input {
+.form-control select {
   min-width: 0;
   padding: 0.55rem 0.65rem;
   color: var(--text);
@@ -940,12 +913,7 @@
 }
 
 .form-control input:focus,
-.form-control select:focus,
-.creature-name-input:focus,
-.creature-settings select:focus,
-.search-input:focus,
-.source-filter:focus,
-.quantity-stepper input:focus {
+.form-control select:focus {
   border-color: var(--accent);
 }
 
@@ -982,6 +950,13 @@
 
 .add-creature-button {
   justify-self: start;
+}
+
+.dialog-form-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .form-help,
@@ -1080,8 +1055,6 @@
 
 .quick-add-search {
   width: 100%;
-  padding: 0.78rem 0.9rem;
-  font-size: 1rem;
 }
 
 .quick-add-shortcuts {
@@ -1111,11 +1084,14 @@
 }
 
 .quick-add-results {
-  display: grid;
-  gap: 0.35rem;
   max-height: min(52vh, 430px);
   padding: 0.2rem;
   overflow-y: auto;
+}
+
+.quick-add-results-virtual {
+  position: relative;
+  width: 100%;
 }
 
 .quick-add-result {
@@ -1139,12 +1115,10 @@
   background: rgba(99, 102, 241, 0.13);
 }
 
-.quick-add-result img {
+.quick-add-thumbnail {
   width: 48px;
   height: 48px;
-  object-fit: contain;
   border-radius: 5px;
-  background: #080a0e;
 }
 
 .quick-add-result-copy {
@@ -1580,16 +1554,6 @@
   padding: 0.9rem;
 }
 
-.creature-name-input {
-  width: 100%;
-  padding: 0.25rem 0;
-  border-width: 0 0 1px;
-  border-radius: 0;
-  background: transparent;
-  font-size: 1rem;
-  font-weight: 650;
-}
-
 .creature-settings {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1878,36 +1842,29 @@
 }
 
 .quantity-stepper {
-  display: grid;
-  grid-template-columns: 32px 48px 32px;
+  height: 32px;
 }
 
-.quantity-stepper button {
-  border: 1px solid var(--border);
-  color: var(--text);
-  background: var(--surface-hover);
-  cursor: pointer;
+.quantity-stepper .MuiButton-root {
+  min-width: 32px;
+  padding: 0;
   font-size: 1rem;
 }
 
-.quantity-stepper button:first-child {
-  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
-}
-
-.quantity-stepper button:last-child {
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-}
-
-.quantity-stepper button:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.quantity-stepper input {
+.quantity-stepper .MuiInputBase-root {
   width: 48px;
-  padding-inline: 0.2rem;
-  border-radius: 0;
+  border-block: 1px solid rgba(255, 255, 255, 0.23);
+}
+
+.quantity-stepper .MuiInputBase-input {
+  padding: 0 0.2rem;
   text-align: center;
+}
+
+.quantity-stepper .MuiInputBase-input::-webkit-inner-spin-button,
+.quantity-stepper .MuiInputBase-input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
 }
 
 .summary-stat {
@@ -1932,15 +1889,6 @@
   display: grid;
   gap: 0.45rem;
   margin: 1.25rem 0;
-}
-
-.paper-format-control .format-picker {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-
-.paper-format-control .format-btn {
-  padding: 0.55rem;
 }
 
 .export-button {
@@ -2180,6 +2128,9 @@
 
 .saved-source-name-input {
   width: min(280px, 100%);
+}
+
+.saved-source-name-input .MuiInputBase-input {
   padding: 0.35rem 0.45rem;
   font-size: 0.84rem;
   font-weight: 650;
@@ -2203,117 +2154,6 @@
   display: flex;
   flex-shrink: 0;
   gap: 0.4rem;
-}
-
-/* --- Toast notifications --- */
-
-.toast-viewport {
-  position: fixed;
-  right: 1.25rem;
-  bottom: 1.25rem;
-  z-index: 1200;
-  display: flex;
-  width: min(390px, calc(100vw - 2rem));
-  flex-direction: column;
-  gap: 0.65rem;
-  pointer-events: none;
-}
-
-.app-toast {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 0.75rem;
-  padding: 0.9rem;
-  background: rgba(26, 29, 39, 0.97);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(16px);
-  pointer-events: auto;
-  animation: toast-enter 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.app-toast-success {
-  border-color: rgba(34, 197, 94, 0.5);
-}
-
-.app-toast-error {
-  border-color: rgba(239, 68, 68, 0.55);
-}
-
-.app-toast-info {
-  border-color: rgba(99, 102, 241, 0.55);
-}
-
-.app-toast-icon {
-  display: grid;
-  width: 1.6rem;
-  height: 1.6rem;
-  place-items: center;
-  color: #c7d2fe;
-  background: rgba(99, 102, 241, 0.15);
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 800;
-}
-
-.app-toast-success .app-toast-icon {
-  color: #86efac;
-  background: rgba(34, 197, 94, 0.15);
-}
-
-.app-toast-error .app-toast-icon {
-  color: #fca5a5;
-  background: rgba(239, 68, 68, 0.15);
-}
-
-.app-toast-copy {
-  min-width: 0;
-}
-
-.app-toast-copy strong {
-  display: block;
-  color: var(--text);
-  font-size: 0.86rem;
-  line-height: 1.35;
-}
-
-.app-toast-copy p {
-  margin-top: 0.2rem;
-  color: var(--text-muted);
-  font-size: 0.76rem;
-  line-height: 1.45;
-}
-
-.app-toast-close {
-  width: 1.5rem;
-  height: 1.5rem;
-  padding: 0;
-  color: var(--text-muted);
-  background: transparent;
-  border: 0;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1.2rem;
-  line-height: 1;
-}
-
-.app-toast-close:hover {
-  color: var(--text);
-  background: var(--surface-hover);
-}
-
-@keyframes toast-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 14px, 0) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
 }
 
 @media (max-width: 900px) {
@@ -2450,10 +2290,14 @@
 
   .quantity-stepper {
     grid-column: 1 / -1;
-    grid-template-columns: 1fr 64px 1fr;
+    width: 100%;
   }
 
-  .quantity-stepper input {
+  .quantity-stepper .MuiButton-root {
+    flex: 1;
+  }
+
+  .quantity-stepper .MuiInputBase-root {
     width: 64px;
   }
 }

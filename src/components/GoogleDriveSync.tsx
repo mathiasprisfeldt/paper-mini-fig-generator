@@ -1,3 +1,5 @@
+import { Alert, Button, Chip, CircularProgress } from "@mui/material";
+
 export type DriveSyncStatus =
   | "disconnected"
   | "connecting"
@@ -37,32 +39,27 @@ export function GoogleDriveSync({
             ▲
           </span>
           <strong>Google Drive</strong>
-          {autosyncEnabled && <span className="drive-sync-badge">Autosync on</span>}
+          {autosyncEnabled && <Chip size="small" color="success" label="Autosync on" />}
         </div>
         <p>{message}</p>
         {!configured && (
-          <p className="drive-configuration-error" role="alert">
-            <span aria-hidden="true">!</span>
-            <span>
-              Google Drive is not configured for this deployment. The site
-              administrator must add the Google OAuth settings and reload the app.
-            </span>
-          </p>
+          <Alert className="drive-configuration-error" severity="error">
+            Google Drive is not configured for this deployment. The site
+            administrator must add the Google OAuth settings and reload the app.
+          </Alert>
         )}
         {!connected && (
-          <p className="drive-local-warning" role="status">
-            <span aria-hidden="true">⚠</span>
-            <span>
-              Local only: until Drive is connected, your creatures and settings will be lost if this site's cache or browser storage is cleared.
-            </span>
-          </p>
+          <Alert className="drive-local-warning" severity="warning">
+            Local only: until Drive is connected, your creatures and settings will be lost if this site's cache or browser storage is cleared.
+          </Alert>
         )}
       </div>
 
       <div className="drive-sync-actions">
         {!connected ? (
-          <button
-            className="btn btn-drive"
+          <Button
+            variant="contained"
+            startIcon={busy ? <CircularProgress size={16} color="inherit" /> : undefined}
             onClick={onConnect}
             disabled={!configured || busy}
             title={!configured ? "Google Drive setup is required" : undefined}
@@ -74,19 +71,20 @@ export function GoogleDriveSync({
               : status === "syncing"
                 ? "Loading Drive…"
                 : "Connect Drive"}
-          </button>
+          </Button>
         ) : (
           <>
-            <button
-              className="btn btn-secondary"
+            <Button
+              variant="outlined"
+              startIcon={status === "syncing" ? <CircularProgress size={16} color="inherit" /> : undefined}
               onClick={onDownloadBackup}
               disabled={busy}
             >
               {status === "syncing" ? "Syncing…" : "Download backup"}
-            </button>
-            <button className="btn btn-secondary btn-disconnect" onClick={onDisconnect}>
+            </Button>
+            <Button variant="outlined" color="error" onClick={onDisconnect}>
               Disconnect
-            </button>
+            </Button>
           </>
         )}
       </div>

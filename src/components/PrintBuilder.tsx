@@ -7,9 +7,14 @@ import {
 } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import {
+  Alert,
   Autocomplete,
+  Button,
+  ButtonGroup,
+  CircularProgress,
   createFilterOptions,
   IconButton,
+  InputBase,
   Menu,
   MenuItem,
   TextField,
@@ -169,30 +174,31 @@ export function PrintBuilder({
       <section className="print-picker">
         <div className="section-toolbar">
           <div className="print-toolbar-actions">
-            <input
+            <TextField
               className="search-input print-search-input"
               type="search"
+              size="small"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search creatures…"
-              aria-label="Search print creatures"
+              slotProps={{ htmlInput: { "aria-label": "Search print creatures" } }}
             />
-            <button
-              className="btn btn-secondary"
+            <Button
+              variant="outlined"
               type="button"
               onClick={onQuickAdd}
               disabled={entries.length === 0}
             >
               Quick add
-            </button>
-            <button
-              className="btn btn-secondary"
+            </Button>
+            <Button
+              variant="outlined"
               type="button"
               onClick={onClearSelection}
               disabled={total === 0}
             >
               Clear selection
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -228,20 +234,29 @@ export function PrintBuilder({
                     <strong>{entry.name || "Unnamed creature"}</strong>
                     <span>{entry.creatureSize} · {entry.miniSize}mm</span>
                   </div>
-                  <div className="quantity-stepper" aria-label={`${entry.name} quantity`}>
-                    <button
+                  <ButtonGroup
+                    className="quantity-stepper"
+                    variant="outlined"
+                    size="small"
+                    aria-label={`${entry.name || "Creature"} quantity`}
+                  >
+                    <Button
+                      size="small"
                       type="button"
                       aria-label={`Decrease ${entry.name || "unnamed creature"} quantity`}
                       onClick={() => onQuantityChange(entry.id, entry.quantity - 1)}
                       disabled={entry.quantity === 0}
                     >
                       −
-                    </button>
-                    <input
+                    </Button>
+                    <InputBase
+                      className="quantity-input"
                       type="number"
-                      aria-label={`${entry.name || "Unnamed creature"} quantity`}
-                      min={0}
-                      max={99}
+                      inputProps={{
+                        "aria-label": `${entry.name || "Unnamed creature"} quantity`,
+                        min: 0,
+                        max: 99,
+                      }}
                       value={entry.quantity}
                       onChange={(event) => {
                         if (event.target.value !== "") {
@@ -249,15 +264,16 @@ export function PrintBuilder({
                         }
                       }}
                     />
-                    <button
+                    <Button
+                      size="small"
                       type="button"
                       aria-label={`Increase ${entry.name || "unnamed creature"} quantity`}
                       onClick={() => onQuantityChange(entry.id, entry.quantity + 1)}
                       disabled={entry.quantity >= 99}
                     >
                       +
-                    </button>
-                  </div>
+                    </Button>
+                  </ButtonGroup>
                 </article>
               );
             })}
@@ -433,30 +449,30 @@ export function PrintBuilder({
                     <h2 id="rename-catalogue-title">Rename catalogue</h2>
                   </div>
                 </div>
-                <label className="form-control print-catalogue-name">
-                  <span>Name</span>
-                  <input
-                    ref={renameInputRef}
+                <TextField
+                    className="print-catalogue-name"
+                    label="Name"
+                    size="small"
+                    inputRef={renameInputRef}
                     value={catalogueNameDraft}
                     onChange={(event) => setCatalogueNameDraft(event.target.value)}
-                    aria-label="Catalogue name"
+                    slotProps={{ htmlInput: { "aria-label": "Catalogue name" } }}
                   />
-                </label>
                 <div className="print-catalogue-actions">
-                  <button
-                    className="btn btn-secondary"
+                  <Button
+                    variant="outlined"
                     type="button"
                     onClick={() => setRenamingCatalogue(false)}
                   >
                     Cancel
-                  </button>
-                  <button
-                    className="btn btn-primary"
+                  </Button>
+                  <Button
+                    variant="contained"
                     type="submit"
                     disabled={!catalogueNameDraft.trim()}
                   >
                     Save
-                  </button>
+                  </Button>
                 </div>
               </form>
             </AppModal>
@@ -473,9 +489,10 @@ export function PrintBuilder({
         <div className="paper-format-control">
           <span>Paper size</span>
           <ToggleButtonGroup
-            className="format-picker"
             exclusive
+            fullWidth
             size="small"
+            color="primary"
             value={paperFormat}
             onChange={(_, format: PaperFormat | null) => {
               if (format) onPaperFormatChange(format);
@@ -483,11 +500,7 @@ export function PrintBuilder({
             aria-label="Paper size"
           >
             {(["a4", "a3"] as PaperFormat[]).map((format) => (
-              <ToggleButton
-                key={format}
-                className="format-btn"
-                value={format}
-              >
+              <ToggleButton key={format} value={format}>
                 {format.toUpperCase()}
               </ToggleButton>
             ))}
@@ -497,19 +510,20 @@ export function PrintBuilder({
         <div className="paper-format-control">
           <span>Page layout</span>
           <ToggleButtonGroup
-            className="format-picker layout-picker"
             exclusive
+            fullWidth
             size="small"
+            color="primary"
             value={printLayout}
             onChange={(_, layout: PrintLayout | null) => {
               if (layout) onPrintLayoutChange(layout);
             }}
             aria-label="PDF page layout"
           >
-            <ToggleButton className="format-btn" value="compact">
+            <ToggleButton value="compact">
               Compact
             </ToggleButton>
-            <ToggleButton className="format-btn" value="per-creature">
+            <ToggleButton value="per-creature">
               Per creature
             </ToggleButton>
           </ToggleButtonGroup>
@@ -518,14 +532,17 @@ export function PrintBuilder({
           </small>
         </div>
 
-        {exportError && <p className="form-error">{exportError}</p>}
-        <button
-          className="btn btn-primary btn-large export-button"
+        {exportError && <Alert severity="error">{exportError}</Alert>}
+        <Button
+          className="export-button"
+          variant="contained"
+          size="large"
           onClick={onGenerate}
           disabled={generating || total === 0}
+          startIcon={generating ? <CircularProgress size={18} color="inherit" /> : undefined}
         >
           {generating ? "Generating PDF…" : "Export PDF"}
-        </button>
+        </Button>
         </section>
       </aside>
     </div>
