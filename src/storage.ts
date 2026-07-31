@@ -5,11 +5,15 @@ import type {
   MiniFigEntry,
   MiniSize,
   PaperFormat,
+  PrintCatalogue,
+  PrintLayout,
 } from "./types";
 
 const CATALOGUES_KEY = "paper-mini-fig-catalogues";
 const ACTIVE_CATALOGUE_KEY = "paper-mini-fig-active-catalogue";
 const PAPER_FORMAT_KEY = "paper-mini-fig-paper-format";
+const PRINT_CATALOGUES_KEY = "paper-mini-fig-print-catalogues";
+const ACTIVE_PRINT_CATALOGUE_KEY = "paper-mini-fig-active-print-catalogue";
 const SOURCES_KEY = "paper-mini-fig-sources";
 const DRIVE_CONNECTION_KEY = "paper-mini-fig-drive-connected";
 const DRIVE_SESSION_KEY = "paper-mini-fig-drive-session";
@@ -17,6 +21,8 @@ const DRIVE_SESSION_VERSION = 2;
 const DRIVE_SESSION_EXPIRY_BUFFER_MS = 30_000;
 
 const VALID_MINI_SIZES: MiniSize[] = [24, 28, 32];
+const VALID_PAPER_FORMATS: PaperFormat[] = ["a4", "a3"];
+const VALID_PRINT_LAYOUTS: PrintLayout[] = ["compact", "per-creature"];
 const VALID_CREATURE_SIZES: CreatureSize[] = [
   "tiny", "small", "medium", "large", "huge", "gargantuan",
 ];
@@ -121,7 +127,72 @@ export function createCatalogue(
   };
 }
 
-const VALID_PAPER_FORMATS: PaperFormat[] = ["a4", "a3"];
+export function migratePrintCatalogue(value: unknown): PrintCatalogue | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.id !== "string" || typeof raw.name !== "string") return null;
+  const entries = Array.isArray(raw.entries)
+    ? raw.entries.flatMap((entry) => {
+        if (!entry || typeof entry !== "object") return [];
+        const candidate = entry as Record<string, unknown>;
+        if (
+          typeof candidate.creatureId !== "string" ||
+          typeof candidate.quantity !== "number" ||
+          !Number.isFinite(candidate.quantity)
+        ) {
+          return [];
+        }
+        const quantity = Math.min(99, Math.max(1, Math.round(candidate.quantity)));
+        return [{ creatureId: candidate.creatureId, quantity }];
+      })
+    : [];
+  return {
+    id: raw.id,
+    name: raw.name,
+    entries,
+    paperFormat: VALID_PAPER_FORMATS.includes(raw.paperFormat as PaperFormat)
+      ? raw.paperFormat as PaperFormat
+      : "a4",
+    printLayout: VALID_PRINT_LAYOUTS.includes(raw.printLayout as PrintLayout)
+      ? raw.printLayout as PrintLayout
+      : "compact",
+    createdAt: typeof raw.createdAt === "number" && Number.isFinite(raw.createdAt)
+      ? raw.createdAt
+      : 0,
+    updatedAt: typeof raw.updatedAt === "number" && Number.isFinite(raw.updatedAt)
+      ? raw.updatedAt
+      : 0,
+  };
+}
+
+export function loadPrintCatalogues(): PrintCatalogue[] {
+  try {
+    const parsed: unknown = JSON.parse(
+      localStorage.getItem(PRINT_CATALOGUES_KEY) || "[]",
+    );
+    return Array.isArray(parsed)
+      ? parsed.flatMap((catalogue) => migratePrintCatalogue(catalogue) ?? [])
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export function savePrintCatalogues(catalogues: PrintCatalogue[]): void {
+  localStorage.setItem(PRINT_CATALOGUES_KEY, JSON.stringify(catalogues));
+}
+
+export function getActivePrintCatalogueId(): string | null {
+  return localStorage.getItem(ACTIVE_PRINT_CATALOGUE_KEY);
+}
+
+export function setActivePrintCatalogueId(id: string | null): void {
+  if (id) {
+    localStorage.setItem(ACTIVE_PRINT_CATALOGUE_KEY, id);
+  } else {
+    localStorage.removeItem(ACTIVE_PRINT_CATALOGUE_KEY);
+  }
+}
 
 export function getPaperFormat(): PaperFormat {
   const raw = localStorage.getItem(PAPER_FORMAT_KEY);

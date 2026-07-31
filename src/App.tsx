@@ -6,6 +6,7 @@ import type {
   MiniFigEntry,
   PaperFormat,
   PrintableMiniFigEntry,
+  PrintCatalogue,
   PrintLayout,
   SourceRefreshResult,
 } from "./types";
@@ -40,7 +41,9 @@ import {
   getPaperFormat,
   loadSources,
   loadCatalogues,
+  loadPrintCatalogues,
   saveCatalogues,
+  savePrintCatalogues,
   saveSources,
   setDriveConnectionPreference,
   setDriveSessionCredential,
@@ -54,6 +57,7 @@ interface DriveSyncPayload {
   accessToken: string;
   catalogues: Catalogue[];
   paperFormat: PaperFormat;
+  printCatalogues: PrintCatalogue[];
   session: number;
   signature: string;
   sources: CreatureSource[];
@@ -62,6 +66,7 @@ interface DriveSyncPayload {
 const PREVIEW_QUERY_PARAM = "preview";
 const MODAL_QUERY_PARAM = "modal";
 const SOURCE_QUERY_PARAM = "source";
+const CATALOGUE_QUERY_PARAM = "catalogue";
 const VIEW_QUERY_PARAM = "view";
 const APP_MODALS: AppModalId[] = ["add-creature", "sources", "quick-add"];
 const APP_VIEWS: AppView[] = ["binder", "print", "settings"];
@@ -74,6 +79,10 @@ function getModalFromUrl(): AppModalId | null {
 
 function getSourceFilterFromUrl(): string | null {
   return new URL(window.location.href).searchParams.get(SOURCE_QUERY_PARAM);
+}
+
+function getPrintCatalogueFromUrl(): string | null {
+  return new URL(window.location.href).searchParams.get(CATALOGUE_QUERY_PARAM);
 }
 
 function getViewFromUrl(): AppView {
@@ -126,6 +135,7 @@ function hashImageData(value: string | null): string | null {
 function createDriveSyncSignature(
   catalogues: Catalogue[],
   paperFormat: PaperFormat,
+  printCatalogues: PrintCatalogue[],
   sources: CreatureSource[],
 ): string {
   return JSON.stringify({
@@ -146,6 +156,7 @@ function createDriveSyncSignature(
       })),
     })),
     paperFormat,
+    printCatalogues,
     sources,
   });
 }
@@ -183,6 +194,12 @@ function App() {
   const [paperFormat, setPaperFormatState] = useState<PaperFormat>(getPaperFormat);
   const [printLayout, setPrintLayout] = useState<PrintLayout>("compact");
   const [printQuantities, setPrintQuantities] = useState<Record<string, number>>({});
+  const [printCatalogues, setPrintCatalogues] = useState<PrintCatalogue[]>(
+    loadPrintCatalogues,
+  );
+  const [activePrintCatalogueId, setActivePrintCatalogueIdState] = useState<
+    string | null
+  >(getPrintCatalogueFromUrl);
   const [generating, setGenerating] = useState(false);
   const [exportError, setExportError] = useState("");
   const [driveAccessToken, setDriveAccessToken] = useState<string | null>(
@@ -207,12 +224,33 @@ function App() {
   const driveRestoreAttempted = useRef(false);
 
   const entries = useMemo(() => catalogues[0]?.entries ?? [], [catalogues]);
+  const activePrintCatalogue = useMemo(
+    () =>
+      printCatalogues.find(
+        (catalogue) => catalogue.id === activePrintCatalogueId,
+      ) ?? null,
+    [activePrintCatalogueId, printCatalogues],
+  );
+  const activePrintQuantities = useMemo(
+    () =>
+      activePrintCatalogue
+        ? Object.fromEntries(
+            activePrintCatalogue.entries.map((entry) => [
+              entry.creatureId,
+              entry.quantity,
+            ]),
+          )
+        : printQuantities,
+    [activePrintCatalogue, printQuantities],
+  );
+  const activePaperFormat = activePrintCatalogue?.paperFormat ?? paperFormat;
+  const activePrintLayout = activePrintCatalogue?.printLayout ?? printLayout;
   const printableEntries = useMemo<PrintableMiniFigEntry[]>(
     () => entries.map((entry) => ({
       ...entry,
-      quantity: printQuantities[entry.id] ?? 0,
+      quantity: activePrintQuantities[entry.id] ?? 0,
     })),
-    [entries, printQuantities],
+    [activePrintQuantities, entries],
   );
   const selectedTotal = printableEntries.reduce(
     (sum, entry) => sum + entry.quantity,
@@ -227,6 +265,9 @@ function App() {
       setPreviewId(url.searchParams.get(PREVIEW_QUERY_PARAM));
       setActiveModal(getModalFromUrl());
       setSourceFilter(url.searchParams.get(SOURCE_QUERY_PARAM));
+      setActivePrintCatalogueIdState(
+        url.searchParams.get(CATALOGUE_QUERY_PARAM),
+      );
       setView(getViewFromUrl());
     };
     window.addEventListener("popstate", syncNavigationFromHistory);
@@ -321,6 +362,10 @@ function App() {
   useEffect(() => {
     saveSources(sources);
   }, [sources]);
+
+  useEffect(() => {
+    savePrintCatalogues(printCatalogues);
+  }, [printCatalogues]);
 
   const setEntries = useCallback(
     (updater: (previous: MiniFigEntry[]) => MiniFigEntry[]) => {
@@ -505,8 +550,34 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [refreshSource, sources]);
 
+  const updateActivePrintCatalogue = useCallback(
+    (updater: (catalogue: PrintCatalogue) => PrintCatalogue) => {
+      if (!activePrintCatalogueId) return;
+      setPrintCatalogues((current) =>
+        current.map((catalogue) =>
+          catalogue.id === activePrintCatalogueId
+            ? { ...updater(catalogue), updatedAt: Date.now() }
+            : catalogue,
+        ),
+      );
+    },
+    [activePrintCatalogueId],
+  );
+
   const setQuantity = useCallback((id: string, quantity: number) => {
     const nextQuantity = Math.min(99, Math.max(0, Math.round(quantity) || 0));
+    if (activePrintCatalogueId) {
+      updateActivePrintCatalogue((catalogue) => ({
+        ...catalogue,
+        entries: nextQuantity === 0
+          ? catalogue.entries.filter((entry) => entry.creatureId !== id)
+          : [
+              ...catalogue.entries.filter((entry) => entry.creatureId !== id),
+              { creatureId: id, quantity: nextQuantity },
+            ],
+      }));
+      return;
+    }
     setPrintQuantities((current) => {
       if (nextQuantity === 0) {
         if (!(id in current)) return current;
@@ -516,16 +587,99 @@ function App() {
       }
       return { ...current, [id]: nextQuantity };
     });
-  }, []);
+  }, [activePrintCatalogueId, updateActivePrintCatalogue]);
 
   const clearPrintSelection = useCallback(() => {
+    if (activePrintCatalogueId) {
+      updateActivePrintCatalogue((catalogue) => ({
+        ...catalogue,
+        entries: [],
+      }));
+      return;
+    }
     setPrintQuantities({});
-  }, []);
+  }, [activePrintCatalogueId, updateActivePrintCatalogue]);
 
   const handleSetPaperFormat = useCallback((format: PaperFormat) => {
+    if (activePrintCatalogueId) {
+      updateActivePrintCatalogue((catalogue) => ({
+        ...catalogue,
+        paperFormat: format,
+      }));
+      return;
+    }
     setPaperFormatState(format);
     savePaperFormat(format);
+  }, [activePrintCatalogueId, updateActivePrintCatalogue]);
+
+  const handleSetPrintLayout = useCallback((layout: PrintLayout) => {
+    if (activePrintCatalogueId) {
+      updateActivePrintCatalogue((catalogue) => ({
+        ...catalogue,
+        printLayout: layout,
+      }));
+      return;
+    }
+    setPrintLayout(layout);
+  }, [activePrintCatalogueId, updateActivePrintCatalogue]);
+
+  const createPrintCatalogue = useCallback((name: string) => {
+    const now = Date.now();
+    const catalogue: PrintCatalogue = {
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      entries: Object.entries(activePrintQuantities).map(
+        ([creatureId, quantity]) => ({ creatureId, quantity }),
+      ),
+      paperFormat: activePaperFormat,
+      printLayout: activePrintLayout,
+      createdAt: now,
+      updatedAt: now,
+    };
+    setPrintCatalogues((current) => [...current, catalogue]);
+    const url = new URL(window.location.href);
+    url.searchParams.set(CATALOGUE_QUERY_PARAM, catalogue.id);
+    window.history.pushState(
+      { ...window.history.state, paperMiniCatalogue: catalogue.id },
+      "",
+      url,
+    );
+    setActivePrintCatalogueIdState(catalogue.id);
+  }, [
+    activePaperFormat,
+    activePrintLayout,
+    activePrintQuantities,
+  ]);
+
+  const selectPrintCatalogue = useCallback((id: string | null) => {
+    const url = new URL(window.location.href);
+    if (id) {
+      url.searchParams.set(CATALOGUE_QUERY_PARAM, id);
+    } else {
+      url.searchParams.delete(CATALOGUE_QUERY_PARAM);
+    }
+    window.history.pushState(
+      { ...window.history.state, paperMiniCatalogue: id },
+      "",
+      url,
+    );
+    setActivePrintCatalogueIdState(id);
   }, []);
+
+  const renamePrintCatalogue = useCallback((name: string) => {
+    updateActivePrintCatalogue((catalogue) => ({ ...catalogue, name }));
+  }, [updateActivePrintCatalogue]);
+
+  const deletePrintCatalogue = useCallback(() => {
+    if (!activePrintCatalogueId) return;
+    setPrintCatalogues((current) =>
+      current.filter((catalogue) => catalogue.id !== activePrintCatalogueId),
+    );
+    const url = new URL(window.location.href);
+    url.searchParams.delete(CATALOGUE_QUERY_PARAM);
+    window.history.replaceState(window.history.state, "", url);
+    setActivePrintCatalogueIdState(null);
+  }, [activePrintCatalogueId]);
 
   const resolveDriveSourceEntries = useCallback(async (
     entriesToResolve: MiniFigEntry[],
@@ -607,10 +761,12 @@ function App() {
         nextCatalogues,
         paperFormat,
         sources,
+        printCatalogues,
       );
       lastDriveSyncSignature.current = createDriveSyncSignature(
         saved.catalogues,
         paperFormat,
+        printCatalogues,
         sources,
       );
       setCatalogues(normalizeAsBinder(saved.catalogues));
@@ -621,7 +777,7 @@ function App() {
       handleDriveError(error);
       throw error;
     }
-  }, [addEntry, catalogues, closeNavigationModal, driveAccessToken, driveAutosync, handleDriveError, paperFormat, sources]);
+  }, [addEntry, catalogues, closeNavigationModal, driveAccessToken, driveAutosync, handleDriveError, paperFormat, printCatalogues, sources]);
 
   const connectAndSyncDrive = useCallback(async (
     prompt: "" | "none",
@@ -649,15 +805,34 @@ function App() {
         if (remote) {
           const remoteCatalogues = normalizeAsBinder(remote.catalogues);
           const remotePaperFormat = remote.paperFormat ?? paperFormat;
+          const remotePrintCatalogues =
+            remote.printCatalogues ?? printCatalogues;
           lastDriveSyncSignature.current = createDriveSyncSignature(
             remoteCatalogues,
             remotePaperFormat,
+            remote.printCatalogues ?? [],
             remote.sources,
           );
           setCatalogues(remoteCatalogues);
+          setPrintCatalogues(remotePrintCatalogues);
+          const selectedCatalogueId = getPrintCatalogueFromUrl();
+          if (
+            selectedCatalogueId &&
+            !remotePrintCatalogues.some(
+              (catalogue) => catalogue.id === selectedCatalogueId,
+            )
+          ) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete(CATALOGUE_QUERY_PARAM);
+            window.history.replaceState(window.history.state, "", url);
+            setActivePrintCatalogueIdState(null);
+          }
           setSources(remote.sources);
           activeSources = remote.sources;
-          if (remote.paperFormat) handleSetPaperFormat(remote.paperFormat);
+          if (remote.paperFormat) {
+            setPaperFormatState(remote.paperFormat);
+            savePaperFormat(remote.paperFormat);
+          }
           setDriveMessage("Binder loaded from Drive. Autosync is on.");
         } else {
           setDriveMessage("Creating your Drive binder…");
@@ -666,12 +841,14 @@ function App() {
             catalogues,
             paperFormat,
             sources,
+            printCatalogues,
           );
           if (session !== driveSession.current) return;
           const savedCatalogues = normalizeAsBinder(saved.catalogues);
           lastDriveSyncSignature.current = createDriveSyncSignature(
             savedCatalogues,
             paperFormat,
+            printCatalogues,
             sources,
           );
           setCatalogues(savedCatalogues);
@@ -730,8 +907,8 @@ function App() {
     catalogues,
     googleClientId,
     handleDriveError,
-    handleSetPaperFormat,
     paperFormat,
+    printCatalogues,
     sources,
   ]);
 
@@ -824,6 +1001,7 @@ function App() {
             payload.catalogues,
             payload.paperFormat,
             payload.sources,
+            payload.printCatalogues,
           );
           if (
             payload.session !== driveSession.current ||
@@ -834,6 +1012,7 @@ function App() {
           lastDriveSyncSignature.current = createDriveSyncSignature(
             saved.catalogues,
             payload.paperFormat,
+            payload.printCatalogues,
             payload.sources,
           );
           applyDriveFileIds(saved.catalogues);
@@ -858,7 +1037,12 @@ function App() {
 
   useEffect(() => {
     if (!driveAutosync || !driveAccessToken) return;
-    const signature = createDriveSyncSignature(catalogues, paperFormat, sources);
+    const signature = createDriveSyncSignature(
+      catalogues,
+      paperFormat,
+      printCatalogues,
+      sources,
+    );
     if (signature === lastDriveSyncSignature.current) return;
 
     const timer = window.setTimeout(() => {
@@ -866,6 +1050,7 @@ function App() {
         accessToken: driveAccessToken,
         catalogues,
         paperFormat,
+        printCatalogues,
         session: driveSession.current,
         signature,
         sources,
@@ -879,6 +1064,7 @@ function App() {
     driveAccessToken,
     driveAutosync,
     paperFormat,
+    printCatalogues,
     runQueuedDriveSync,
     sources,
   ]);
@@ -902,9 +1088,9 @@ function App() {
       );
       await generatePdf(
         resolvedForPrint,
-        paperFormat,
-        "paper-minis",
-        printLayout,
+        activePaperFormat,
+        activePrintCatalogue?.name || "paper-minis",
+        activePrintLayout,
       );
     } catch (error) {
       const message = error instanceof Error
@@ -926,7 +1112,7 @@ function App() {
     (entry) =>
       entry.quantity > 0 &&
       hasEntryImage(entry) &&
-      isEntryOversized(entry, paperFormat),
+      isEntryOversized(entry, activePaperFormat),
   ).length;
 
   const driveSyncPanel = (
@@ -1008,13 +1194,15 @@ function App() {
           {oversizedCount > 0 && (
             <div className="oversized-notice">
               <span>⚠️</span>
-              <span>{oversizedCount} selected creature{oversizedCount === 1 ? " is" : "s are"} wider than {paperFormat.toUpperCase()}.</span>
+              <span>{oversizedCount} selected creature{oversizedCount === 1 ? " is" : "s are"} wider than {activePaperFormat.toUpperCase()}.</span>
             </div>
           )}
           <PrintBuilder
             entries={printableEntries}
-            paperFormat={paperFormat}
-            printLayout={printLayout}
+            printCatalogues={printCatalogues}
+            activePrintCatalogueId={activePrintCatalogueId}
+            paperFormat={activePaperFormat}
+            printLayout={activePrintLayout}
             generating={generating}
             exportError={exportError}
             onQuantityChange={setQuantity}
@@ -1023,8 +1211,12 @@ function App() {
             onQuickAdd={() => openNavigationModal("quick-add")}
             onClearSelection={clearPrintSelection}
             onPaperFormatChange={handleSetPaperFormat}
-            onPrintLayoutChange={setPrintLayout}
+            onPrintLayoutChange={handleSetPrintLayout}
             onGenerate={handleGenerate}
+            onCreatePrintCatalogue={createPrintCatalogue}
+            onSelectPrintCatalogue={selectPrintCatalogue}
+            onRenamePrintCatalogue={renamePrintCatalogue}
+            onDeletePrintCatalogue={deletePrintCatalogue}
           />
         </main>
       ) : (
