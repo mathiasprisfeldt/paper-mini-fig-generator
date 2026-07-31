@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ButtonBase, TextField } from "@mui/material";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { AutoSizer, List } from "react-virtualized";
 import type { PrintableMiniFigEntry } from "../types";
 import { AppModal } from "./AppModal";
 import { CreatureThumbnail } from "./CreatureThumbnail";
@@ -11,15 +11,11 @@ interface Props {
   onClose: () => void;
 }
 
-const ESTIMATED_RESULT_HEIGHT = 64;
-const RESULT_GAP = 6;
-
 export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
-  const [resultsElement, setResultsElement] = useState<HTMLDivElement | null>(null);
+  const resultsListRef = useRef<List>(null);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [announcement, setAnnouncement] = useState("");
-  const [activeDescendantId, setActiveDescendantId] = useState<string>();
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return [...entries]
@@ -30,37 +26,13 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
     ? Math.min(selectedIndex, results.length - 1)
     : 0;
   const activeEntry = results[activeIndex];
-  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual is the established list virtualizer in this app.
-  const resultVirtualizer = useVirtualizer({
-    count: results.length,
-    getScrollElement: () => resultsElement,
-    estimateSize: () => ESTIMATED_RESULT_HEIGHT,
-    gap: RESULT_GAP,
-    overscan: 6,
-    getItemKey: (index) => results[index]?.id ?? index,
-  });
-  const virtualResults = resultVirtualizer.getVirtualItems();
   const activeOptionId = activeEntry ? `quick-add-${activeEntry.id}` : undefined;
-  const activeOptionMounted = virtualResults.some(
-    (virtualResult) => virtualResult.index === activeIndex,
-  );
-
-  useLayoutEffect(() => {
-    resultVirtualizer.measure();
-  }, [resultVirtualizer, results.length]);
-
-  useLayoutEffect(() => {
-    if (!activeOptionId) {
-      setActiveDescendantId(undefined);
-    } else if (activeOptionMounted) {
-      setActiveDescendantId(activeOptionId);
-    }
-  }, [activeOptionId, activeOptionMounted]);
 
   useEffect(() => {
-    if (!activeEntry) return;
-    resultVirtualizer.scrollToIndex(activeIndex, { align: "auto" });
-  }, [activeEntry, activeIndex, resultVirtualizer]);
+    if (activeOptionId) {
+      resultsListRef.current?.scrollToRow(activeIndex);
+    }
+  }, [activeIndex, activeOptionId]);
 
   const addCreature = (entry: PrintableMiniFigEntry) => {
     onAdd(entry.id);
@@ -91,16 +63,6 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
       if (activeEntry) addCreature(activeEntry);
       return;
     }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      if (query) {
-        setQuery("");
-        setSelectedIndex(0);
-        setAnnouncement("");
-      } else {
-        onClose();
-      }
-    }
   };
 
   return (
@@ -108,7 +70,6 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
       className="quick-add-dialog"
       backdropClassName="quick-add-backdrop"
       ariaLabel="Quick add creatures"
-      closeOnEscape={false}
       onKeyDown={handleKeyDown}
       onClose={onClose}
     >
@@ -144,7 +105,7 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
               "aria-expanded": "true",
               "aria-autocomplete": "list",
               "aria-controls": "quick-add-results",
-              "aria-activedescendant": activeDescendantId,
+              "aria-activedescendant": activeOptionId,
             },
           }}
         />
@@ -152,66 +113,63 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
         <div className="quick-add-shortcuts" aria-hidden="true">
           <span><kbd>↑</kbd><kbd>↓</kbd> select</span>
           <span><kbd>Enter</kbd> add</span>
-          <span><kbd>Esc</kbd> clear / close</span>
+          <span><kbd>Esc</kbd> close</span>
         </div>
 
         <div
-          ref={setResultsElement}
           className="quick-add-results"
           id="quick-add-results"
           role="listbox"
         >
           {results.length ? (
-            <div
-              className="quick-add-results-virtual"
-              role="presentation"
-              style={{ height: resultVirtualizer.getTotalSize() }}
-            >
-              {virtualResults.map((virtualResult) => {
-                const entry = results[virtualResult.index];
-                const index = virtualResult.index;
-                return (
-                  <ButtonBase
-                    ref={resultVirtualizer.measureElement}
-                    id={`quick-add-${entry.id}`}
-                    className={`quick-add-result${index === activeIndex ? " active" : ""}`}
-                    component="button"
-                    type="button"
-                    role="option"
-                    aria-selected={index === activeIndex}
-                    aria-posinset={index + 1}
-                    aria-setsize={results.length}
-                    data-index={index}
-                    key={entry.id}
-                    onMouseEnter={() => setSelectedIndex(index)}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => addCreature(entry)}
-                    sx={{
-                      display: "grid",
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      transform: `translateY(${virtualResult.start}px)`,
-                    }}
-                  >
-                    <CreatureThumbnail
-                      className="quick-add-thumbnail"
-                      entry={entry}
-                      imageLoading="eager"
-                      interactive={false}
-                      showHint={false}
-                    />
-                    <span className="quick-add-result-copy">
-                      <strong>{entry.name || "Unnamed creature"}</strong>
-                      <small>{entry.creatureSize} · {entry.miniSize}mm</small>
-                    </span>
-                    <span className="quick-add-count">
-                      {entry.quantity ? `${entry.quantity} selected` : "Add"}
-                    </span>
-                  </ButtonBase>
-                );
-              })}
-            </div>
+            <AutoSizer>
+              {({ height, width }) => (
+                <List
+                  ref={resultsListRef}
+                  height={height}
+                  overscanRowCount={6}
+                  rowCount={results.length}
+                  rowHeight={64}
+                  rowRenderer={({ index, key, style }) => {
+                    const entry = results[index];
+                    return (
+                      <ButtonBase
+                        id={`quick-add-${entry.id}`}
+                        className={`quick-add-result${index === activeIndex ? " active" : ""}`}
+                        component="button"
+                        type="button"
+                        role="option"
+                        aria-selected={index === activeIndex}
+                        aria-posinset={index + 1}
+                        aria-setsize={results.length}
+                        key={key}
+                        style={style}
+                        onMouseEnter={() => setSelectedIndex(index)}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => addCreature(entry)}
+                        sx={{ display: "grid" }}
+                      >
+                        <CreatureThumbnail
+                          className="quick-add-thumbnail"
+                          entry={entry}
+                          imageLoading="eager"
+                          interactive={false}
+                          showHint={false}
+                        />
+                        <span className="quick-add-result-copy">
+                          <strong>{entry.name || "Unnamed creature"}</strong>
+                          <small>{entry.creatureSize} · {entry.miniSize}mm</small>
+                        </span>
+                        <span className="quick-add-count">
+                          {entry.quantity ? `${entry.quantity} selected` : "Add"}
+                        </span>
+                      </ButtonBase>
+                    );
+                  }}
+                  width={width}
+                />
+              )}
+            </AutoSizer>
           ) : (
             <div className="quick-add-empty">
               <strong>No matching creatures</strong>
