@@ -1,4 +1,13 @@
 import { useState } from "react";
+import {
+  Alert,
+  AlertTitle,
+  Button,
+  CircularProgress,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+} from "@mui/material";
 import { openDriveFolderPicker } from "../googleDrive";
 import type {
   CreatureSource,
@@ -183,39 +192,36 @@ export function SourceDialog({
           </div>
         </div>
 
-        <div className="source-tabs source-type-tabs" aria-label="Source type">
-          <button className={sourceType === "html" ? "active" : ""} onClick={() => { setSourceType("html"); resetFeedback(); }}>
+        <ToggleButtonGroup
+          className="source-tabs source-type-tabs"
+          value={sourceType}
+          exclusive
+          size="small"
+          onChange={(_, value: "html" | "drive" | null) => {
+            if (!value) return;
+            setSourceType(value);
+            resetFeedback();
+          }}
+          aria-label="Source type"
+        >
+          <ToggleButton value="html">
             HTML page
-          </button>
-          <button className={sourceType === "drive" ? "active" : ""} onClick={() => { setSourceType("drive"); resetFeedback(); }}>
+          </ToggleButton>
+          <ToggleButton value="drive">
             Drive folder
-          </button>
-        </div>
+          </ToggleButton>
+        </ToggleButtonGroup>
 
         {sourceType === "html" ? (
           <>
             <p className="dialog-intro">Add a directory page and select its image links with a CSS selector.</p>
             <div className="source-form">
-              <label className="form-control">
-                <span>Source name</span>
-                <input value={name} onChange={(event) => setName(event.target.value)} placeholder="My D&D artwork" />
-              </label>
-              <label className="form-control source-url-field">
-                <span>Page URL</span>
-                <input
-                  type="url"
-                  value={url}
-                  onChange={(event) => setUrl(event.target.value)}
-                  placeholder="https://example.com/creatures/"
-                />
-              </label>
-              <label className="form-control">
-                <span>HTML selector</span>
-                <input value={selector} onChange={(event) => setSelector(event.target.value)} placeholder="a[href]" />
-              </label>
-              <button className="btn btn-primary" onClick={handleAddHtml} disabled={busySourceId !== null}>
+              <TextField size="small" label="Source name" value={name} onChange={(event) => setName(event.target.value)} placeholder="My D&D artwork" />
+              <TextField className="source-url-field" size="small" label="Page URL" type="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://example.com/creatures/" />
+              <TextField size="small" label="HTML selector" value={selector} onChange={(event) => setSelector(event.target.value)} placeholder="a[href]" />
+              <Button variant="contained" onClick={handleAddHtml} disabled={busySourceId !== null} startIcon={busySourceId === "new" ? <CircularProgress size={16} color="inherit" /> : undefined}>
                 {busySourceId === "new" ? "Reading source…" : "Add HTML source"}
-              </button>
+              </Button>
             </div>
             <p className="form-help">
               Example: <code>a[href]</code> finds links such as <code>&lt;a href="Aerthos%20Vaal.png"&gt;</code>. Only image-file links are added.
@@ -225,40 +231,35 @@ export function SourceDialog({
           <div className="drive-source-setup">
             <div className="drive-source-copy">
               <p>Select one folder from your Google Drive. Image files directly inside it become creatures in the binder.</p>
-              <label className="form-control drive-source-name">
-                <span>Source name</span>
-                <input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Defaults to the folder name"
-                />
-              </label>
+              <TextField className="drive-source-name" size="small" label="Source name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Defaults to the folder name" />
             </div>
             {!accessToken ? (
-              <p className="source-requirement">Connect Google Drive above before choosing a folder.</p>
+              <Alert className="source-requirement" severity="info">
+                Connect Google Drive above before choosing a folder.
+              </Alert>
             ) : !pickerConfigured ? (
-              <p className="source-requirement">
+              <Alert className="source-requirement" severity="warning">
                 Drive folder sources require the Google Picker app ID and API key in this deployment.
-              </p>
+              </Alert>
             ) : (
-              <button className="btn btn-primary" onClick={handleChooseDriveFolder} disabled={busySourceId !== null}>
+              <Button variant="contained" onClick={handleChooseDriveFolder} disabled={busySourceId !== null} startIcon={busySourceId === "new" ? <CircularProgress size={16} color="inherit" /> : undefined}>
                 {busySourceId === "new" ? "Opening Drive…" : "Choose Drive folder"}
-              </button>
+              </Button>
             )}
           </div>
         )}
 
-        {message && <p className="form-success">{message}</p>}
-        {error && <p className="form-error">{error}</p>}
+        {message && <Alert severity="success">{message}</Alert>}
+        {error && <Alert severity="error">{error}</Alert>}
         {showCorsHelp && (
-          <div className="cors-help" role="alert">
-            <strong>The browser could not read this source</strong>
+          <Alert className="cors-help" severity="warning">
+            <AlertTitle>The browser could not read this source</AlertTitle>
             <p>First confirm the source opens in another tab. If it does, the most likely cause is a cross-origin (CORS) restriction; changing the selector will not fix it. The owner must return this header for the directory page and every image:</p>
             <pre>Access-Control-Allow-Origin: *</pre>
             <p>For Apache, add this to the site's <code>.htaccess</code> file:</p>
             <pre>{`<IfModule mod_headers.c>\n  Header always set Access-Control-Allow-Origin "*"\n  Header always set Access-Control-Allow-Methods "GET, OPTIONS"\n</IfModule>`}</pre>
             <p>If it still fails, check the connection, DNS, and hosting provider's firewall/WAF logs, then allow cross-origin GET requests to the image directory.</p>
-          </div>
+          </Alert>
         )}
 
         {sources.length > 0 && (
@@ -268,8 +269,10 @@ export function SourceDialog({
               <article className="saved-source" key={source.id}>
                 <div>
                   {renamingSourceId === source.id ? (
-                    <input
+                    <TextField
                       className="saved-source-name-input"
+                      size="small"
+                      variant="standard"
                       value={renameValue}
                       onChange={(event) => setRenameValue(event.target.value)}
                       onKeyDown={(event) => {
@@ -288,16 +291,16 @@ export function SourceDialog({
                 <div>
                   {renamingSourceId === source.id ? (
                     <>
-                      <button className="btn btn-primary" onClick={() => saveRename(source)}>Save</button>
-                      <button className="btn btn-secondary" onClick={cancelRenaming}>Cancel</button>
+                      <Button variant="contained" size="small" onClick={() => saveRename(source)}>Save</Button>
+                      <Button variant="outlined" size="small" onClick={cancelRenaming}>Cancel</Button>
                     </>
                   ) : (
                     <>
-                      <button className="btn btn-secondary" onClick={() => startRenaming(source)} disabled={busySourceId !== null || renamingSourceId !== null}>Rename</button>
-                      <button className="btn btn-secondary" onClick={() => handleRefresh(source)} disabled={busySourceId !== null || renamingSourceId !== null || (source.type === "drive" && !accessToken)}>
+                      <Button variant="outlined" size="small" onClick={() => startRenaming(source)} disabled={busySourceId !== null || renamingSourceId !== null}>Rename</Button>
+                      <Button variant="outlined" size="small" onClick={() => handleRefresh(source)} disabled={busySourceId !== null || renamingSourceId !== null || (source.type === "drive" && !accessToken)} startIcon={busySourceId === source.id ? <CircularProgress size={14} color="inherit" /> : undefined}>
                         {busySourceId === source.id ? "Refreshing…" : "Refresh"}
-                      </button>
-                      <button className="btn btn-danger-ghost" onClick={() => onRemove(source)} disabled={busySourceId !== null || renamingSourceId !== null}>Remove</button>
+                      </Button>
+                      <Button variant="outlined" color="error" size="small" onClick={() => onRemove(source)} disabled={busySourceId !== null || renamingSourceId !== null}>Remove</Button>
                     </>
                   )}
                 </div>

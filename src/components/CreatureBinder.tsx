@@ -9,6 +9,16 @@ import type {
 } from "../types";
 import { useToast } from "../toastContext";
 import { CreatureThumbnail } from "./CreatureThumbnail";
+import {
+  Button,
+  Checkbox,
+  FormControl,
+  FormControlLabel,
+  InputLabel,
+  MenuItem,
+  Select,
+  TextField,
+} from "@mui/material";
 
 interface Props {
   entries: MiniFigEntry[];
@@ -177,46 +187,66 @@ export function CreatureBinder({
     <section className="binder-section">
       <div className="section-toolbar">
         <div className="binder-toolbar-actions">
-          <input
+          <TextField
             className="search-input"
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search creatures…"
-            aria-label="Search creatures"
+            size="small"
+            slotProps={{ htmlInput: { "aria-label": "Search creatures" } }}
           />
-          <select
-            className="source-filter"
-            value={activeSourceFilter}
-            onChange={(event) =>
-              onSourceFilterChange(event.target.value || null)
-            }
-            aria-label="Filter creatures by source"
-          >
-            <option value={ALL_SOURCES}>All creatures ({entries.length})</option>
-            <option value={MANUAL_SOURCE}>
-              Manually added ({sourceCounts.get(MANUAL_SOURCE) ?? 0})
-            </option>
-            {sources.map((source) => (
-              <option value={source.id} key={source.id}>
-                {source.name} ({sourceCounts.get(source.id) ?? 0})
-              </option>
-            ))}
-          </select>
+          <FormControl className="source-filter" size="small">
+            <Select
+              value={activeSourceFilter}
+              onChange={(event) =>
+                onSourceFilterChange(event.target.value || null)
+              }
+              displayEmpty
+              inputProps={{ "aria-label": "Filter creatures by source" }}
+            >
+              <MenuItem value={ALL_SOURCES}>All creatures ({entries.length})</MenuItem>
+              <MenuItem value={MANUAL_SOURCE}>
+                Manually added ({sourceCounts.get(MANUAL_SOURCE) ?? 0})
+              </MenuItem>
+              {sources.map((source) => (
+                <MenuItem value={source.id} key={source.id}>
+                  {source.name} ({sourceCounts.get(source.id) ?? 0})
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <div className="source-button-group">
-            <button className="btn btn-secondary" onClick={onManageSources}>Sources</button>
-            <button
-              className="btn btn-secondary source-refresh-button"
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={onManageSources}
+              sx={{ borderRadius: "var(--radius-sm) 0 0 var(--radius-sm)" }}
+            >
+              Sources
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
               type="button"
               onClick={refreshAllSources}
               disabled={sources.length === 0 || refreshing}
               aria-label="Refresh all sources"
               title={sources.length === 0 ? "Add a source first" : "Refresh all sources"}
+              sx={{
+                minWidth: "2.45rem",
+                maxWidth: "2.45rem",
+                paddingInline: 0,
+                borderRadius: "0 var(--radius-sm) var(--radius-sm) 0",
+                borderLeftWidth: 0,
+              }}
             >
               <span className={refreshing ? "refresh-icon spinning" : "refresh-icon"} aria-hidden="true">↻</span>
-            </button>
+            </Button>
           </div>
-          <button className="btn btn-primary" onClick={onAddCreature}>+ Add creature</button>
+          <Button variant="contained" size="small" onClick={onAddCreature}>
+            + Add creature
+          </Button>
         </div>
       </div>
 
@@ -257,47 +287,77 @@ export function CreatureBinder({
                     />
 
                     <div className="creature-card-body">
-                      <input
-                        className="creature-name-input"
+                      <TextField
                         value={entry.name}
                         onChange={(event) => onUpdate(entry.id, { name: event.target.value })}
-                        aria-label="Creature name"
+                        slotProps={{ htmlInput: { "aria-label": "Creature name" } }}
+                        variant="standard"
+                        fullWidth
+                        sx={{ "& .MuiInputBase-input": { fontSize: "1rem", fontWeight: 650 } }}
                       />
                       <div className="creature-settings">
-                        <label>
-                          <span>Size</span>
-                          <select
+                        <FormControl size="small" fullWidth>
+                          <InputLabel id={`size-label-${entry.id}`}>Size</InputLabel>
+                          <Select
+                            labelId={`size-label-${entry.id}`}
                             value={entry.creatureSize}
-                            onChange={(event) => onUpdate(entry.id, { creatureSize: event.target.value as CreatureSize })}
+                            label="Size"
+                            onChange={(event) =>
+                              onUpdate(entry.id, { creatureSize: event.target.value as CreatureSize })
+                            }
                           >
                             {CREATURE_SIZES.map((size) => (
-                              <option key={size} value={size}>{size[0].toUpperCase() + size.slice(1)}</option>
+                              <MenuItem key={size} value={size}>
+                                {size[0].toUpperCase() + size.slice(1)}
+                              </MenuItem>
                             ))}
-                          </select>
-                        </label>
-                        <label>
-                          <span>Scale</span>
-                          <select
+                          </Select>
+                        </FormControl>
+                        <FormControl size="small" fullWidth>
+                          <InputLabel id={`scale-label-${entry.id}`}>Scale</InputLabel>
+                          <Select
+                            labelId={`scale-label-${entry.id}`}
                             value={entry.miniSize}
-                            onChange={(event) => onUpdate(entry.id, { miniSize: Number(event.target.value) as MiniSize })}
+                            label="Scale"
+                            onChange={(event) =>
+                              onUpdate(entry.id, { miniSize: Number(event.target.value) as MiniSize })
+                            }
                           >
-                            {MINI_SIZES.map((size) => <option key={size} value={size}>{size}mm</option>)}
-                          </select>
-                        </label>
+                            {MINI_SIZES.map((size) => (
+                              <MenuItem key={size} value={size}>{size}mm</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
                       </div>
-                      <label className="card-toggle">
-                        <input
-                          type="checkbox"
-                          checked={entry.showName}
-                          onChange={(event) => onUpdate(entry.id, { showName: event.target.checked })}
-                        />
-                        Show name on base
-                      </label>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={entry.showName}
+                            onChange={(event) =>
+                              onUpdate(entry.id, { showName: event.target.checked })
+                            }
+                            size="small"
+                          />
+                        }
+                        label="Show name on base"
+                        sx={{
+                          margin: 0,
+                          "& .MuiFormControlLabel-label": {
+                            color: "text.secondary",
+                            fontSize: "0.78rem",
+                          },
+                        }}
+                      />
                       <div className="creature-card-actions">
                         {!entry.sourceId && (
-                          <button className="btn btn-danger-ghost" onClick={() => onRemove(entry.id)}>
+                          <Button
+                            variant="outlined"
+                            color="error"
+                            size="small"
+                            onClick={() => onRemove(entry.id)}
+                          >
                             Remove
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </div>

@@ -78,6 +78,7 @@ export function DriveImageProvider({ accessToken, children }: ProviderProps) {
 function useLazyEntryImageSource(
   entry: MiniFigEntry,
   targetRef: RefObject<HTMLImageElement | null>,
+  eager: boolean,
 ): string | null {
   const directSource = entry.imageDataUrl || entry.imageUrl;
   const context = useContext(DriveImageContext);
@@ -89,7 +90,7 @@ function useLazyEntryImageSource(
   } | null>(null);
 
   useEffect(() => {
-    if (directSource || !entry.imageDriveFileId) return;
+    if (directSource || !entry.imageDriveFileId || eager) return;
     const target = targetRef.current;
     if (!target) return;
 
@@ -108,12 +109,12 @@ function useLazyEntryImageSource(
     );
     observer.observe(target);
     return () => observer.disconnect();
-  }, [directSource, entry.imageDriveFileId, targetRef]);
+  }, [directSource, eager, entry.imageDriveFileId, targetRef]);
 
   useEffect(() => {
     if (
       directSource ||
-      !visible ||
+      (!eager && !visible) ||
       !entry.imageDriveFileId ||
       !context
     ) {
@@ -137,7 +138,7 @@ function useLazyEntryImageSource(
     return () => {
       active = false;
     };
-  }, [context, directSource, entry.imageDriveFileId, visible]);
+  }, [context, directSource, eager, entry.imageDriveFileId, visible]);
 
   if (directSource) return directSource;
   if (
@@ -155,16 +156,17 @@ interface DriveCreatureImageProps extends ImgHTMLAttributes<HTMLImageElement> {
 
 export function DriveCreatureImage({
   entry,
+  loading = "lazy",
   ...imageProps
 }: DriveCreatureImageProps) {
   const imageRef = useRef<HTMLImageElement>(null);
-  const source = useLazyEntryImageSource(entry, imageRef);
+  const source = useLazyEntryImageSource(entry, imageRef, loading === "eager");
   return (
     <img
       {...imageProps}
       ref={imageRef}
       src={source ?? undefined}
-      loading="lazy"
+      loading={loading}
     />
   );
 }

@@ -1,5 +1,11 @@
-import { useEffect, useState } from "react";
-import { FormControlLabel, Radio, RadioGroup } from "@mui/material";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+} from "react";
+import { Alert, FormControlLabel, Radio, RadioGroup } from "@mui/material";
 import { getEffectiveWidthMm, renderPreview } from "../generatePdf";
 import type { MiniFigEntry, PrintableMiniFigEntry } from "../types";
 import { AppModal } from "./AppModal";
@@ -9,6 +15,14 @@ interface Props {
   resolveEntry: (entry: MiniFigEntry) => Promise<MiniFigEntry>;
   onClose: () => void;
 }
+
+interface DragState {
+  pointerId: number;
+  x: number;
+  rotation: number;
+}
+
+const INITIAL_ROTATION = -25;
 
 export function ExportPreviewDialog({ entry, resolveEntry, onClose }: Props) {
   const [previewUrl, setPreviewUrl] = useState("");
@@ -21,6 +35,47 @@ export function ExportPreviewDialog({ entry, resolveEntry, onClose }: Props) {
   const [previewAspect, setPreviewAspect] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"folded" | "layout">("folded");
+  const [rotation, setRotation] = useState(INITIAL_ROTATION);
+  const [isDragging, setIsDragging] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
+  const dragState = useRef<DragState | null>(null);
+
+  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    setHasInteracted(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragState.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      rotation,
+    };
+    setIsDragging(true);
+  };
+
+  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const drag = dragState.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    setRotation(drag.rotation + (event.clientX - drag.x) * 0.55);
+  };
+
+  const handlePointerEnd = (event: PointerEvent<HTMLDivElement>) => {
+    if (dragState.current?.pointerId !== event.pointerId) return;
+    dragState.current = null;
+    setIsDragging(false);
+  };
+
+  const handleRotationKey = (event: KeyboardEvent<HTMLDivElement>) => {
+    const steps: Partial<Record<typeof event.key, number>> = {
+      ArrowLeft: rotation - 10,
+      ArrowRight: rotation + 10,
+      Home: INITIAL_ROTATION,
+    };
+    const nextRotation = steps[event.key];
+    if (!nextRotation) return;
+    event.preventDefault();
+    setHasInteracted(true);
+    setRotation(nextRotation);
+  };
 
   useEffect(() => {
     let active = true;
@@ -70,36 +125,46 @@ export function ExportPreviewDialog({ entry, resolveEntry, onClose }: Props) {
         </header>
 
         <div className={`export-preview-stage ${mode === "folded" ? "folded" : ""}`}>
-          {!previewUrl && !error && <div className="preview-loading">Rendering preview…</div>}
-          {error && <p className="form-error">{error}</p>}
+          {(!previewUrl || (mode === "folded" && previewAspect === null)) && !error && (
+            <div className="preview-loading">Rendering preview…</div>
+          )}
+          {error && <Alert severity="error">{error}</Alert>}
           {previewUrl && mode === "layout" && (
             <img src={previewUrl} alt={`Foldable export layout for ${entry.name || "this creature"}`} />
           )}
-          {previewUrl && mode === "folded" && (
+          {previewUrl && previewAspect !== null && mode === "folded" && (
             <div
-              className="miniature-3d-scene"
+              className={`miniature-3d-scene ${isDragging ? "is-dragging" : ""}`}
               role="img"
-              aria-label={`Folded three-dimensional paper miniature of ${entry.name || "this creature"}, opened slightly to reveal both the front and back artwork`}
+              aria-label={`Rotatable folded paper miniature of ${entry.name || "this creature"}. Drag horizontally or use the left and right arrow keys to view its front and back.`}
+              tabIndex={0}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerEnd}
+              onPointerCancel={handlePointerEnd}
+              onKeyDown={handleRotationKey}
             >
               <div
-                className="miniature-3d-figure"
+                className={`miniature-3d-figure ${hasInteracted ? "" : "show-rotation-nudge"}`}
                 aria-hidden="true"
-                style={previewAspect ? { aspectRatio: `${previewAspect}` } : undefined}
+                style={{
+                  aspectRatio: `${previewAspect * 2}`,
+                  transform: `rotateY(${rotation}deg)`,
+                }}
               >
-                <div className="miniature-3d-panel miniature-3d-panel-back">
+                <div className="miniature-3d-face miniature-3d-face-front">
                   <div
-                    className="miniature-3d-panel-art"
+                    className="miniature-3d-face-art"
                     style={{ backgroundImage: `url(${previewUrl})` }}
                   />
                 </div>
-                <div className="miniature-3d-panel miniature-3d-panel-front">
+                <div className="miniature-3d-face miniature-3d-face-back">
                   <div
-                    className="miniature-3d-panel-art"
+                    className="miniature-3d-face-art"
                     style={{ backgroundImage: `url(${previewUrl})` }}
                   />
                 </div>
               </div>
-              <div className="miniature-3d-base" aria-hidden="true" />
             </div>
           )}
           <RadioGroup
@@ -109,16 +174,16 @@ export function ExportPreviewDialog({ entry, resolveEntry, onClose }: Props) {
             aria-label="Preview mode"
             row
           >
-            <FormControlLabel value="folded" control={<Radio size="small" />} label="Folded 3D" />
-            <FormControlLabel value="layout" control={<Radio size="small" />} label="Print layout" />
+            <FormControlLabel value="folded" control={<Radio size="small" />} label="Folded" />
+            <FormControlLabel value="layout" control={<Radio size="small" />} label="Printed" />
           </RadioGroup>
         </div>
 
-        <p className="export-preview-help">
-          {mode === "folded"
-            ? "Opened partway to show the front artwork and the mirrored back artwork that appears once the strip is folded and glued into a standee."
-            : "This is the strip placed in the PDF. Fold it between the mirrored and upright artwork."}
-        </p>
+        {mode === "layout" && (
+          <p className="export-preview-help">
+            This is the strip placed in the PDF. Fold it between the mirrored and upright artwork.
+          </p>
+        )}
     </AppModal>
   );
 }

@@ -28,6 +28,21 @@ export interface PrintableMiniFigEntry extends MiniFigEntry {
   quantity: number;
 }
 
+export interface PrintCatalogueEntry {
+  creatureId: string;
+  quantity: number;
+}
+
+export interface PrintCatalogue {
+  id: string;
+  name: string;
+  entries: PrintCatalogueEntry[];
+  paperFormat: PaperFormat;
+  printLayout: PrintLayout;
+  createdAt: number;
+  updatedAt: number;
+}
+
 interface CreatureSourceBase {
   id: string;
   name: string;

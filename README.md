@@ -11,6 +11,7 @@ A web-based tool for creating printable 28mm paper miniatures for tabletop games
 - Keep a reusable binder of named creatures and their D&D sizes
 - Add artwork manually or connect an HTML page that lists hosted images
 - Select session-only print quantities without changing or syncing binder entries
+- Save reusable print catalogues with creature quantities, paper size, and layout
 - Choose 24mm, 28mm, or 32mm mini scale and A4 or A3 paper
 - Generate compact print-ready PDFs or start each creature type on its own page
 - Preview miniatures as a folded 3D model or flat print layout
@@ -48,7 +49,8 @@ Users connect their own Google account. The app writes a
 Drive's hidden `appDataFolder`. Linked images remain external URLs in the
 manifest, so they do not consume additional Drive storage. Only this app can
 access the hidden files, and they do not appear in the user's regular Drive
-folders. The app requests `drive.appdata` for its hidden storage and
+folders. The manifest includes the creature binder, print catalogues, sources,
+and print settings. The app requests `drive.appdata` for its hidden storage and
 `drive.readonly` so it can discover and render images in a folder the user
 chooses through Google Picker. The app only queries saved source folders.
 

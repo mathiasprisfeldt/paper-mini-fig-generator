@@ -18,4 +18,25 @@ export const appTheme = createTheme({
   typography: {
     fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
+  components: {
+    MuiButton: {
+      defaultProps: {
+        disableElevation: true,
+      },
+      styleOverrides: {
+        root: {
+          fontWeight: 650,
+          textTransform: "none",
+        },
+      },
+    },
+    MuiToggleButton: {
+      styleOverrides: {
+        root: {
+          fontWeight: 650,
+          textTransform: "none",
+        },
+      },
+    },
+  },
 });

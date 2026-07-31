@@ -8,6 +8,7 @@ interface Props {
   ariaLabel?: string;
   ariaLabelledBy?: string;
   closeOnEscape?: boolean;
+  onEntered?: () => void;
   onKeyDown?: KeyboardEventHandler<HTMLElement>;
   onClose: () => void;
 }
@@ -19,6 +20,7 @@ export function AppModal({
   ariaLabel,
   ariaLabelledBy,
   closeOnEscape = true,
+  onEntered,
   onKeyDown,
   onClose,
 }: Props) {
@@ -34,6 +36,7 @@ export function AppModal({
       slotProps={{
         backdrop: { className: backdropClassName },
         paper: { className: `app-dialog ${className}`.trim() },
+        transition: { onEntered },
       }}
     >
       <DialogContent

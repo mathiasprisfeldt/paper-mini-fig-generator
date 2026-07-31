@@ -1,4 +1,18 @@
 import { useRef, useState } from "react";
+import {
+  Alert,
+  Button,
+  Checkbox,
+  FormControl,
+  FormControlLabel,
+  InputAdornment,
+  InputLabel,
+  MenuItem,
+  Select,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+} from "@mui/material";
 import type { CreatureSize, MiniFigEntry, MiniSize } from "../types";
 
 interface Props {
@@ -205,124 +219,179 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
           <span className="eyebrow">New creature</span>
           <h2>Add to your binder</h2>
         </div>
-        <div className="source-tabs" aria-label="Image source">
-          <button
-            className={`${sourceMode === "upload" ? "active " : ""}${!uploadEnabled ? "requires-drive" : ""}`.trim()}
-            onClick={() => {
-              if (!uploadEnabled) {
-                setError("Connect Google Drive and load or save your binder before uploading images.");
-                return;
-              }
-              setSourceMode("upload");
-              setError("");
-            }}
+        <ToggleButtonGroup
+          className="source-tabs"
+          value={sourceMode}
+          exclusive
+          onChange={(_, val: "upload" | "url" | null) => {
+            if (!val) return;
+            if (val === "upload" && !uploadEnabled) {
+              setError("Connect Google Drive and load or save your binder before uploading images.");
+              return;
+            }
+            setSourceMode(val);
+            setError("");
+          }}
+          aria-label="Image source"
+        >
+          <ToggleButton
+            value="upload"
+            className={!uploadEnabled ? "requires-drive" : ""}
             aria-describedby={!uploadEnabled ? "upload-drive-requirement" : undefined}
             title={uploadEnabled ? "Upload an image to Google Drive" : "Connect and sync Google Drive first"}
             data-tooltip={!uploadEnabled ? "Connect Drive and enable autosync to upload images" : undefined}
           >
             <span>Upload image</span>
             {!uploadEnabled && <span className="drive-required-badge">Drive required</span>}
-          </button>
-          <button
-            className={sourceMode === "url" ? "active" : ""}
-            onClick={() => setSourceMode("url")}
-          >
-            Image URL
-          </button>
-        </div>
+          </ToggleButton>
+          <ToggleButton value="url">Image URL</ToggleButton>
+        </ToggleButtonGroup>
       </div>
 
       <div className="add-creature-grid">
-        <label className="form-control form-control-name">
-          <span>Name</span>
-          <input
-            value={name}
-            onChange={(event) => {
-              suggestedName.current = null;
-              setName(event.target.value);
-            }}
-            placeholder="e.g. Owlbear"
-          />
-        </label>
+        <TextField
+          fullWidth
+          size="small"
+          label="Name"
+          value={name}
+          onChange={(event) => {
+            suggestedName.current = null;
+            setName(event.target.value);
+          }}
+          placeholder="e.g. Owlbear"
+        />
 
         {sourceMode === "upload" ? (
-          <label className="form-control form-control-source" key="upload-source">
-            <span>Image file</span>
+          <div key="upload-source" style={{ minWidth: 0 }}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Image file"
+              value={file ? file.name : ""}
+              slotProps={{
+                input: {
+                  readOnly: true,
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Button
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          inputRef.current?.click();
+                        }}
+                      >
+                        Browse
+                      </Button>
+                    </InputAdornment>
+                  ),
+                },
+                htmlInput: { style: { cursor: "pointer" } },
+              }}
+              onClick={() => inputRef.current?.click()}
+            />
+            {/* Native file input stays visually hidden; triggered by the Browse button */}
             <input
               ref={inputRef}
               type="file"
               accept="image/*"
+              style={{ display: "none" }}
               onChange={(event) =>
                 handleFileChange(event.target.files?.[0] ?? null)
               }
             />
-          </label>
+          </div>
         ) : (
-          <label className="form-control form-control-source" key="url-source">
-            <span>Direct image URL</span>
-            <input
-              type="url"
-              value={imageUrl}
-              onChange={(event) => handleImageUrlChange(event.target.value)}
-              placeholder="https://example.com/images/owlbear.png"
-            />
-          </label>
+          <TextField
+            key="url-source"
+            fullWidth
+            size="small"
+            label="Direct image URL"
+            type="url"
+            value={imageUrl}
+            onChange={(event) => handleImageUrlChange(event.target.value)}
+            placeholder="https://example.com/images/owlbear.png"
+          />
         )}
 
-        <label className="form-control">
-          <span>Creature size</span>
-          <select
+        <FormControl size="small" fullWidth>
+          <InputLabel id="creature-size-label">Creature size</InputLabel>
+          <Select
+            labelId="creature-size-label"
             value={creatureSize}
+            label="Creature size"
             onChange={(event) => setCreatureSize(event.target.value as CreatureSize)}
           >
             {CREATURE_SIZES.map((size) => (
-              <option key={size} value={size}>
+              <MenuItem key={size} value={size}>
                 {size[0].toUpperCase() + size.slice(1)}
-              </option>
+              </MenuItem>
             ))}
-          </select>
-        </label>
+          </Select>
+        </FormControl>
 
-        <label className="form-control">
-          <span>Mini scale</span>
-          <select
+        <FormControl size="small" fullWidth>
+          <InputLabel id="mini-size-label">Mini scale</InputLabel>
+          <Select
+            labelId="mini-size-label"
             value={miniSize}
+            label="Mini scale"
             onChange={(event) => setMiniSize(Number(event.target.value) as MiniSize)}
           >
             {MINI_SIZES.map((size) => (
-              <option key={size} value={size}>{size}mm</option>
+              <MenuItem key={size} value={size}>{size}mm</MenuItem>
             ))}
-          </select>
-        </label>
+          </Select>
+        </FormControl>
 
-        <label className="toggle-control">
-          <input
-            type="checkbox"
-            checked={showName}
-            onChange={(event) => setShowName(event.target.checked)}
-          />
-          Print name on base
-        </label>
+        <FormControlLabel
+          className="toggle-control"
+          sx={{ margin: 0, alignSelf: "center" }}
+          control={
+            <Checkbox
+              checked={showName}
+              onChange={(event) => setShowName(event.target.checked)}
+              size="small"
+            />
+          }
+          label="Print name on base"
+        />
 
         <div className="dialog-form-actions">
-          {onCancel && <button className="btn btn-secondary" onClick={onCancel}>Cancel</button>}
-          <button className="btn btn-primary add-creature-button" onClick={handleAdd} disabled={adding}>
+          {onCancel && (
+            <Button variant="outlined" size="small" onClick={onCancel}>
+              Cancel
+            </Button>
+          )}
+          <Button
+            variant="contained"
+            size="small"
+            onClick={handleAdd}
+            disabled={adding}
+          >
             {adding ? (sourceMode === "upload" ? "Saving to Drive…" : "Checking image…") : "Add creature"}
-          </button>
+          </Button>
         </div>
       </div>
 
       {!uploadEnabled && (
-        <p className="form-help upload-drive-requirement" id="upload-drive-requirement">
+        <Alert
+          severity="warning"
+          id="upload-drive-requirement"
+          sx={{ mt: 1, fontSize: "0.75rem", lineHeight: 1.45 }}
+        >
           <strong>Google Drive required for uploads.</strong> Connect Drive, then load or save your binder to enable autosync. Image links can still be added without Drive.
-        </p>
+        </Alert>
       )}
       {sourceMode === "url" && (
-        <p className="form-help">
+        <Alert severity="info" sx={{ mt: 1, fontSize: "0.75rem", lineHeight: 1.45 }}>
           Paste the full link to an image file. The host must allow cross-origin access for PDF export.
-        </p>
+        </Alert>
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && (
+        <Alert severity="error" sx={{ mt: 1 }}>
+          {error}
+        </Alert>
+      )}
     </section>
   );
 }
