@@ -13,7 +13,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from "@mui/material";
-import type { CreatureSize, MiniFigEntry, MiniSize } from "../types";
+import type { CreatureSize, MiniFigEntry } from "../types";
 
 interface Props {
   uploadEnabled: boolean;
@@ -29,7 +29,6 @@ const CREATURE_SIZES: CreatureSize[] = [
   "huge",
   "gargantuan",
 ];
-const MINI_SIZES: MiniSize[] = [24, 28, 32];
 
 function readableImageName(value: string): string {
   const withoutExtension = value.replace(/\.[^.]+$/, "");
@@ -116,7 +115,6 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState("");
   const [creatureSize, setCreatureSize] = useState<CreatureSize>("medium");
-  const [miniSize, setMiniSize] = useState<MiniSize>(28);
   const [showName, setShowName] = useState(true);
   const [error, setError] = useState("");
   const [adding, setAdding] = useState(false);
@@ -201,7 +199,6 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
         blurHash: null,
         sourceId: null,
         showName,
-        miniSize,
         creatureSize,
       });
       reset();
@@ -325,20 +322,6 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
               <MenuItem key={size} value={size}>
                 {size[0].toUpperCase() + size.slice(1)}
               </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        <FormControl size="small" fullWidth>
-          <InputLabel id="mini-size-label">Mini scale</InputLabel>
-          <Select
-            labelId="mini-size-label"
-            value={miniSize}
-            label="Mini scale"
-            onChange={(event) => setMiniSize(Number(event.target.value) as MiniSize)}
-          >
-            {MINI_SIZES.map((size) => (
-              <MenuItem key={size} value={size}>{size}mm</MenuItem>
             ))}
           </Select>
         </FormControl>

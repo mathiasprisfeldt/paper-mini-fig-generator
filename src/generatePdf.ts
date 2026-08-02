@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import type {
   MiniFigEntry,
+  MiniSize,
   CreatureSize,
   PaperFormat,
   PrintableMiniFigEntry,
@@ -106,8 +107,8 @@ const CREATURE_SIZE_MULTIPLIERS: Record<CreatureSize, number> = {
   gargantuan: 4,
 };
 
-export function getEffectiveWidthMm(entry: MiniFigEntry): number {
-  return entry.miniSize * CREATURE_SIZE_MULTIPLIERS[entry.creatureSize];
+export function getEffectiveWidthMm(entry: MiniFigEntry, miniSize: MiniSize): number {
+  return miniSize * CREATURE_SIZE_MULTIPLIERS[entry.creatureSize];
 }
 
 export function getUsablePageWidthMm(format: PaperFormat): number {
@@ -117,8 +118,9 @@ export function getUsablePageWidthMm(format: PaperFormat): number {
 export function isEntryOversized(
   entry: MiniFigEntry,
   format: PaperFormat,
+  miniSize: MiniSize,
 ): boolean {
-  return getEffectiveWidthMm(entry) > getUsablePageWidthMm(format);
+  return getEffectiveWidthMm(entry, miniSize) > getUsablePageWidthMm(format);
 }
 
 function imageHeightMm(img: HTMLImageElement, widthMm: number): number {
@@ -588,17 +590,17 @@ function drawMiniToPdf(pdf: jsPDF, mini: MiniPdfData, ox: number, oy: number) {
   pdf.addImage(botUrl, "PNG", ox, botBandY - fadeMm, widthMm, bandMm + fadeMm);
 }
 
-export async function generatePdf(
+async function buildPdf(
   entries: PrintableMiniFigEntry[],
   format: PaperFormat = "a4",
-  catalogueName = "paper-minis",
   layout: PrintLayout = "compact",
-): Promise<void> {
+  miniSize: MiniSize = 28,
+): Promise<jsPDF | null> {
   await fontReady;
   const validEntries = entries.filter(
     (entry) => entry.quantity > 0 && getEntryImageSource(entry),
   );
-  if (validEntries.length === 0) return;
+  if (validEntries.length === 0) return null;
 
   const { widthMm: pageW, heightMm: pageH } = PAPER_SIZES[format];
   const usableW = pageW - PAGE_MARGIN_MM * 2;
@@ -608,7 +610,7 @@ export async function generatePdf(
 
   for (const entry of validEntries) {
     const img = await loadImage(getEntryImageSource(entry)!);
-    const widthMm = getEffectiveWidthMm(entry);
+    const widthMm = getEffectiveWidthMm(entry, miniSize);
     const minis: MiniPdfData[] = [];
     for (let i = 0; i < entry.quantity; i++) {
       const number = entry.quantity > 1 ? i + 1 : null;
@@ -671,20 +673,44 @@ export async function generatePdf(
     }
   }
 
+  return pdf;
+}
+
+export async function generatePdf(
+  entries: PrintableMiniFigEntry[],
+  format: PaperFormat = "a4",
+  catalogueName = "paper-minis",
+  layout: PrintLayout = "compact",
+  miniSize: MiniSize = 28,
+): Promise<void> {
+  const pdf = await buildPdf(entries, format, layout, miniSize);
+  if (!pdf) return;
+
   const safeName =
     catalogueName.replace(/[^a-z0-9_\-\s]/gi, "").trim() || "paper-minis";
   pdf.save(`${safeName}.pdf`);
 }
 
+export async function renderPrintSheetPreview(
+  entries: PrintableMiniFigEntry[],
+  format: PaperFormat,
+  layout: PrintLayout,
+  miniSize: MiniSize,
+): Promise<Blob | null> {
+  const pdf = await buildPdf(entries, format, layout, miniSize);
+  return pdf ? pdf.output("blob") : null;
+}
+
 export async function renderPreview(
   entry: MiniFigEntry,
   number: number | null,
+  miniSize: MiniSize,
 ): Promise<string> {
   await fontReady;
   const source = getEntryImageSource(entry);
   if (!source) return "";
   const img = await loadImage(source);
-  const widthMm = getEffectiveWidthMm(entry);
+  const widthMm = getEffectiveWidthMm(entry, miniSize);
   const canvas = drawMiniFigToCanvas(
     img,
     entry.name,

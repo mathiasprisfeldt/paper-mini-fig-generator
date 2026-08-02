@@ -8,6 +8,7 @@ interface Props {
   ariaLabel?: string;
   ariaLabelledBy?: string;
   closeOnEscape?: boolean;
+  disableEnforceFocus?: boolean;
   onEntered?: () => void;
   onKeyDown?: KeyboardEventHandler<HTMLElement>;
   onClose: () => void;
@@ -20,6 +21,7 @@ export function AppModal({
   ariaLabel,
   ariaLabelledBy,
   closeOnEscape = true,
+  disableEnforceFocus = false,
   onEntered,
   onKeyDown,
   onClose,
@@ -32,6 +34,7 @@ export function AppModal({
       }}
       aria-label={ariaLabel}
       aria-labelledby={ariaLabelledBy}
+      disableEnforceFocus={disableEnforceFocus}
       maxWidth={false}
       slotProps={{
         backdrop: { className: backdropClassName },
