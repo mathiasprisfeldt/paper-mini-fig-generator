@@ -1,9 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Tab, Tabs } from "@mui/material";
+import {
+  Alert,
+  IconButton,
+  ListItemText,
+  Menu,
+  MenuItem,
+  Switch,
+  Tab,
+  Tabs,
+} from "@mui/material";
 import type {
   Catalogue,
   CreatureSource,
   MiniFigEntry,
+  MiniSize,
   PaperFormat,
   PrintableMiniFigEntry,
   PrintCatalogue,
@@ -13,8 +23,9 @@ import type {
 import { AddCreatureForm } from "./components/AddCreatureForm";
 import { AppModal } from "./components/AppModal";
 import { CreatureBinder } from "./components/CreatureBinder";
-import { ExportPreviewDialog } from "./components/ExportPreviewDialog";
+import { CreaturePreviewDialog } from "./components/CreaturePreviewDialog";
 import { PrintBuilder } from "./components/PrintBuilder";
+import { PrintSheetPreviewDialog } from "./components/PrintSheetPreviewDialog";
 import { QuickAddDialog } from "./components/QuickAddDialog";
 import { SourceDialog, type SourceDraft } from "./components/SourceDialog";
 import { DriveImageProvider } from "./driveImages";
@@ -39,6 +50,7 @@ import {
   getDriveConnectionPreference,
   getDriveSessionCredential,
   getPaperFormat,
+  getMiniSize,
   loadSources,
   loadCatalogues,
   loadPrintCatalogues,
@@ -48,6 +60,7 @@ import {
   setDriveConnectionPreference,
   setDriveSessionCredential,
   setPaperFormat as savePaperFormat,
+  setMiniSize as saveMiniSize,
 } from "./storage";
 import "./App.css";
 
@@ -151,7 +164,6 @@ function createDriveSyncSignature(
         blurHash: entry.blurHash,
         sourceId: entry.sourceId,
         showName: entry.showName,
-        miniSize: entry.miniSize,
         creatureSize: entry.creatureSize,
       })),
     })),
@@ -183,6 +195,8 @@ function App() {
     normalizeAsBinder(loadCatalogues()),
   );
   const [view, setView] = useState<AppView>(getViewFromUrl);
+  const [debugMenuAnchor, setDebugMenuAnchor] = useState<HTMLElement | null>(null);
+  const [forcePlaceholders, setForcePlaceholders] = useState(false);
   const [activeModal, setActiveModal] = useState<AppModalId | null>(getModalFromUrl);
   const [sourceFilter, setSourceFilter] = useState<string | null>(
     getSourceFilterFromUrl,
@@ -192,6 +206,7 @@ function App() {
   );
   const [sources, setSources] = useState<CreatureSource[]>(loadSources);
   const [paperFormat, setPaperFormatState] = useState<PaperFormat>(getPaperFormat);
+  const [miniSize, setMiniSizeState] = useState<MiniSize>(getMiniSize);
   const [printLayout, setPrintLayout] = useState<PrintLayout>("compact");
   const [printQuantities, setPrintQuantities] = useState<Record<string, number>>({});
   const [printCatalogues, setPrintCatalogues] = useState<PrintCatalogue[]>(
@@ -202,6 +217,7 @@ function App() {
   >(getPrintCatalogueFromUrl);
   const [generating, setGenerating] = useState(false);
   const [exportError, setExportError] = useState("");
+  const [isPrintSheetPreviewOpen, setIsPrintSheetPreviewOpen] = useState(false);
   const [driveAccessToken, setDriveAccessToken] = useState<string | null>(
     initialDriveSession?.accessToken ?? null,
   );
@@ -245,6 +261,7 @@ function App() {
   );
   const activePaperFormat = activePrintCatalogue?.paperFormat ?? paperFormat;
   const activePrintLayout = activePrintCatalogue?.printLayout ?? printLayout;
+  const activeMiniSize = activePrintCatalogue?.miniSize ?? miniSize;
   const printableEntries = useMemo<PrintableMiniFigEntry[]>(
     () => entries.map((entry) => ({
       ...entry,
@@ -426,7 +443,6 @@ function App() {
               blurHash: null,
               sourceId: source.id,
               showName: true,
-              miniSize: 28,
               creatureSize: "medium",
             };
       });
@@ -619,6 +635,15 @@ function App() {
     setPrintLayout(layout);
   }, [activePrintCatalogueId, updateActivePrintCatalogue]);
 
+  const handleSetMiniSize = useCallback((size: MiniSize) => {
+    if (activePrintCatalogueId) {
+      updateActivePrintCatalogue((catalogue) => ({ ...catalogue, miniSize: size }));
+      return;
+    }
+    setMiniSizeState(size);
+    saveMiniSize(size);
+  }, [activePrintCatalogueId, updateActivePrintCatalogue]);
+
   const createPrintCatalogue = useCallback((name: string) => {
     const now = Date.now();
     const catalogue: PrintCatalogue = {
@@ -629,6 +654,7 @@ function App() {
       ),
       paperFormat: activePaperFormat,
       printLayout: activePrintLayout,
+      miniSize: activeMiniSize,
       createdAt: now,
       updatedAt: now,
     };
@@ -644,6 +670,7 @@ function App() {
   }, [
     activePaperFormat,
     activePrintLayout,
+    activeMiniSize,
     activePrintQuantities,
   ]);
 
@@ -1087,6 +1114,7 @@ function App() {
         activePaperFormat,
         activePrintCatalogue?.name || "paper-minis",
         activePrintLayout,
+        activeMiniSize,
       );
     } catch (error) {
       const message = error instanceof Error
@@ -1108,7 +1136,7 @@ function App() {
     (entry) =>
       entry.quantity > 0 &&
       hasEntryImage(entry) &&
-      isEntryOversized(entry, activePaperFormat),
+      isEntryOversized(entry, activePaperFormat, activeMiniSize),
   ).length;
 
   const driveSyncPanel = (
@@ -1133,37 +1161,76 @@ function App() {
           <h1>Paper Mini Foundry</h1>
           <p className="subtitle">Build a reusable creature binder, then compose a print sheet.</p>
         </div>
-        <Tabs
-          className="view-tabs"
-          value={view}
-          onChange={(_, nextView: AppView) => changeView(nextView)}
-          aria-label="App sections"
-        >
-          <Tab value="binder" label="Binder" />
-          <Tab value="print" label="Print" />
-          <Tab
-            value="settings"
-            className="settings-tab"
-            icon={
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path
-                  d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.74v.5a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"
-                />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-            }
-            aria-label="Settings"
-          />
-        </Tabs>
+        <div className="header-navigation">
+          <Tabs
+            className="view-tabs"
+            value={view}
+            onChange={(_, nextView: AppView) => changeView(nextView)}
+            aria-label="App sections"
+          >
+            <Tab value="binder" label="Binder" />
+            <Tab value="print" label="Print" />
+            <Tab
+              value="settings"
+              className="settings-tab"
+              icon={
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.74v.5a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"
+                  />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              }
+              aria-label="Settings"
+            />
+          </Tabs>
+        </div>
       </header>
+      <IconButton
+        className="debug-menu-button"
+        aria-label="Debug tools"
+        aria-controls={debugMenuAnchor ? "debug-tools-menu" : undefined}
+        aria-expanded={debugMenuAnchor ? "true" : undefined}
+        aria-haspopup="menu"
+        onClick={(event) => setDebugMenuAnchor(event.currentTarget)}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 9h6v6H9zM9 3v3m6-3v3M9 18v3m6-3v3M3 9h3m12 0h3M3 15h3m12 0h3" />
+          <rect x="6" y="6" width="12" height="12" rx="3" />
+        </svg>
+      </IconButton>
+      <Menu
+        id="debug-tools-menu"
+        anchorEl={debugMenuAnchor}
+        open={Boolean(debugMenuAnchor)}
+        onClose={() => setDebugMenuAnchor(null)}
+        anchorOrigin={{ horizontal: "left", vertical: "top" }}
+        transformOrigin={{ horizontal: "left", vertical: "bottom" }}
+      >
+        <MenuItem
+          onClick={() => setForcePlaceholders((current) => !current)}
+        >
+          <ListItemText
+            primary="Show placeholders only"
+            secondary="Skip thumbnail image loading"
+          />
+          <Switch
+            edge="end"
+            checked={forcePlaceholders}
+            slotProps={{ input: { "aria-label": "Show placeholders only" } }}
+            onClick={(event) => event.stopPropagation()}
+            onChange={(_, checked) => setForcePlaceholders(checked)}
+          />
+        </MenuItem>
+      </Menu>
 
       {view !== "settings" && !driveAccessToken && driveSyncPanel}
 
@@ -1173,7 +1240,8 @@ function App() {
             entries={entries}
             sources={sources}
             sourceFilter={sourceFilter}
-            onUpdate={updateEntry}
+            forcePlaceholders={forcePlaceholders}
+            imageRetryKey={driveAccessToken ? "connected" : "disconnected"}
             onRemove={removeEntry}
             onAddCreature={() => openNavigationModal("add-creature")}
             onManageSources={() => openNavigationModal("sources")}
@@ -1195,6 +1263,7 @@ function App() {
             activePrintCatalogueId={activePrintCatalogueId}
             paperFormat={activePaperFormat}
             printLayout={activePrintLayout}
+            miniSize={activeMiniSize}
             generating={generating}
             exportError={exportError}
             onQuantityChange={setQuantity}
@@ -1204,6 +1273,8 @@ function App() {
             onClearSelection={clearPrintSelection}
             onPaperFormatChange={handleSetPaperFormat}
             onPrintLayoutChange={handleSetPrintLayout}
+            onMiniSizeChange={handleSetMiniSize}
+            onPrint={() => setIsPrintSheetPreviewOpen(true)}
             onGenerate={handleGenerate}
             onCreatePrintCatalogue={createPrintCatalogue}
             onSelectPrintCatalogue={selectPrintCatalogue}
@@ -1275,11 +1346,25 @@ function App() {
       </footer>
 
       {previewEntry && (
-        <ExportPreviewDialog
+        <CreaturePreviewDialog
           key={previewEntry.id}
           entry={previewEntry}
+          miniSize={activeMiniSize}
           resolveEntry={resolvePreviewEntry}
+          forcePlaceholder={forcePlaceholders}
+          onUpdate={updateEntry}
           onClose={closeCreaturePreview}
+        />
+      )}
+      {isPrintSheetPreviewOpen && (
+        <PrintSheetPreviewDialog
+          entries={printableEntries}
+          format={activePaperFormat}
+          layout={activePrintLayout}
+          miniSize={activeMiniSize}
+          resolveEntries={resolveDriveSourceEntries}
+          autoPrint
+          onClose={() => setIsPrintSheetPreviewOpen(false)}
         />
       )}
     </div>

@@ -12,6 +12,7 @@ import type {
 const CATALOGUES_KEY = "paper-mini-fig-catalogues";
 const ACTIVE_CATALOGUE_KEY = "paper-mini-fig-active-catalogue";
 const PAPER_FORMAT_KEY = "paper-mini-fig-paper-format";
+const MINI_SIZE_KEY = "paper-mini-fig-mini-size";
 const PRINT_CATALOGUES_KEY = "paper-mini-fig-print-catalogues";
 const ACTIVE_PRINT_CATALOGUE_KEY = "paper-mini-fig-active-print-catalogue";
 const SOURCES_KEY = "paper-mini-fig-sources";
@@ -46,9 +47,6 @@ export function migrateMiniFigEntry(e: unknown): MiniFigEntry {
     blurHash: typeof raw.blurHash === "string" ? raw.blurHash : null,
     sourceId: typeof raw.sourceId === "string" ? raw.sourceId : null,
     showName: typeof raw.showName === "boolean" ? raw.showName : true,
-    miniSize: VALID_MINI_SIZES.includes(raw.miniSize as MiniSize)
-      ? (raw.miniSize as MiniSize)
-      : 28,
     creatureSize: VALID_CREATURE_SIZES.includes(raw.creatureSize as CreatureSize)
       ? (raw.creatureSize as CreatureSize)
       : "medium",
@@ -156,6 +154,9 @@ export function migratePrintCatalogue(value: unknown): PrintCatalogue | null {
     printLayout: VALID_PRINT_LAYOUTS.includes(raw.printLayout as PrintLayout)
       ? raw.printLayout as PrintLayout
       : "compact",
+    miniSize: VALID_MINI_SIZES.includes(raw.miniSize as MiniSize)
+      ? raw.miniSize as MiniSize
+      : 28,
     createdAt: typeof raw.createdAt === "number" && Number.isFinite(raw.createdAt)
       ? raw.createdAt
       : 0,
@@ -204,6 +205,16 @@ export function getPaperFormat(): PaperFormat {
 
 export function setPaperFormat(format: PaperFormat): void {
   localStorage.setItem(PAPER_FORMAT_KEY, format);
+}
+
+export function getMiniSize(): MiniSize {
+  const raw = localStorage.getItem(MINI_SIZE_KEY);
+  const size = Number(raw);
+  return VALID_MINI_SIZES.includes(size as MiniSize) ? size as MiniSize : 28;
+}
+
+export function setMiniSize(size: MiniSize): void {
+  localStorage.setItem(MINI_SIZE_KEY, String(size));
 }
 
 export function loadSources(): CreatureSource[] {

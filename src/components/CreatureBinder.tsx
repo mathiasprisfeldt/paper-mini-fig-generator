@@ -12,10 +12,8 @@ import {
   WindowScroller,
 } from "react-virtualized";
 import type {
-  CreatureSize,
   CreatureSource,
   MiniFigEntry,
-  MiniSize,
   SourceRefreshResult,
 } from "../types";
 import { useToast } from "../toastContext";
@@ -23,13 +21,17 @@ import { CreatureSearch } from "./CreatureSearch";
 import { CreatureThumbnail } from "./CreatureThumbnail";
 import {
   Button,
+  IconButton,
+  Menu,
+  MenuItem,
 } from "@mui/material";
 
 interface Props {
   entries: MiniFigEntry[];
+  forcePlaceholders: boolean;
+  imageRetryKey: string;
   sources: CreatureSource[];
   sourceFilter: string | null;
-  onUpdate: (id: string, patch: Partial<MiniFigEntry>) => void;
   onRemove: (id: string) => void;
   onPreview: (id: string) => void;
   onAddCreature: () => void;
@@ -38,22 +40,19 @@ interface Props {
   onSourceFilterChange: (sourceId: string | null) => void;
 }
 
-const CREATURE_SIZES: CreatureSize[] = [
-  "tiny", "small", "medium", "large", "huge", "gargantuan",
-];
-const MINI_SIZES: MiniSize[] = [24, 28, 32];
 const ALL_SOURCES = "";
 const MANUAL_SOURCE = "manual";
 const CARD_MIN_WIDTH = 230;
 const GRID_GAP = 8;
-const INITIAL_ROW_HEIGHT_ESTIMATE = 400;
+const INITIAL_ROW_HEIGHT_ESTIMATE = 290;
 
 interface CreatureBinderCardProps {
   entry: MiniFigEntry;
   entryIndex: number;
   entriesCount: number;
+  forcePlaceholders: boolean;
+  imageRetryKey: string;
   loadedImageKeys: Set<string>;
-  onUpdate: (id: string, patch: Partial<MiniFigEntry>) => void;
   onRemove: (id: string) => void;
   onPreview: (id: string) => void;
 }
@@ -62,15 +61,13 @@ const CreatureBinderCard = memo(function CreatureBinderCard({
   entry,
   entryIndex,
   entriesCount,
+  forcePlaceholders,
+  imageRetryKey,
   loadedImageKeys,
-  onUpdate,
   onRemove,
   onPreview,
 }: CreatureBinderCardProps) {
-  const handleBlurHash = useCallback(
-    (id: string, blurHash: string) => onUpdate(id, { blurHash }),
-    [onUpdate],
-  );
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
 
   return (
     <article
@@ -79,88 +76,58 @@ const CreatureBinderCard = memo(function CreatureBinderCard({
       aria-posinset={entryIndex + 1}
       aria-setsize={entriesCount}
     >
+      {!entry.sourceId && (
+        <IconButton
+          className="binder-card-menu-button"
+          aria-label={`Actions for ${entry.name || "unnamed creature"}`}
+          aria-controls={menuAnchor ? `creature-actions-${entry.id}` : undefined}
+          aria-haspopup="menu"
+          aria-expanded={menuAnchor ? "true" : undefined}
+          onClick={(event) => {
+            event.stopPropagation();
+            setMenuAnchor(event.currentTarget);
+          }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="5" r="1.7" />
+            <circle cx="12" cy="12" r="1.7" />
+            <circle cx="12" cy="19" r="1.7" />
+          </svg>
+        </IconButton>
+      )}
       <CreatureThumbnail
         className="creature-art"
         entry={entry}
+        forcePlaceholder={forcePlaceholders}
         imageLoading="eager"
+        key={`${entry.id}:${imageRetryKey}`}
         loadedImageKeys={loadedImageKeys}
         onPreview={onPreview}
-        onBlurHash={handleBlurHash}
       />
 
       <div className="creature-card-body">
-        <input
-          className="binder-creature-name"
-          aria-label="Creature name"
-          value={entry.name}
-          onChange={(event) =>
-            onUpdate(entry.id, {
-              name: event.target.value,
-            })
-          }
-        />
-        <div className="creature-settings">
-          <label className="binder-card-select">
-            <span>Size</span>
-            <select
-              aria-label="Size"
-              value={entry.creatureSize}
-              onChange={(event) =>
-                onUpdate(entry.id, {
-                  creatureSize: event.target.value as CreatureSize,
-                })
-              }
-            >
-              {CREATURE_SIZES.map((size) => (
-                <option key={size} value={size}>
-                  {size[0].toUpperCase() + size.slice(1)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="binder-card-select">
-            <span>Scale</span>
-            <select
-              aria-label="Scale"
-              value={entry.miniSize}
-              onChange={(event) =>
-                onUpdate(entry.id, {
-                  miniSize: Number(event.target.value) as MiniSize,
-                })
-              }
-            >
-              {MINI_SIZES.map((size) => (
-                <option key={size} value={size}>
-                  {size}mm
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <label className="binder-card-checkbox">
-          <input
-            type="checkbox"
-            checked={entry.showName}
-            onChange={(event) =>
-              onUpdate(entry.id, {
-                showName: event.target.checked,
-              })
-            }
-          />
-          <span>Show name on base</span>
-        </label>
-        <div className="creature-card-actions">
-          {!entry.sourceId && (
-            <button
-              className="binder-remove-button"
-              type="button"
-              onClick={() => onRemove(entry.id)}
-            >
-              Remove
-            </button>
-          )}
-        </div>
+        <strong className="binder-creature-title">
+          {entry.name || "Unnamed creature"}
+        </strong>
       </div>
+      <Menu
+        id={`creature-actions-${entry.id}`}
+        anchorEl={menuAnchor}
+        open={Boolean(menuAnchor)}
+        onClose={() => setMenuAnchor(null)}
+        anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
+        transformOrigin={{ horizontal: "right", vertical: "top" }}
+      >
+        <MenuItem
+          className="binder-remove-menu-item"
+          onClick={() => {
+            setMenuAnchor(null);
+            onRemove(entry.id);
+          }}
+        >
+          Remove
+        </MenuItem>
+      </Menu>
     </article>
   );
 });
@@ -170,12 +137,12 @@ interface BinderGridRowProps {
   rowIndex: number;
   columnCount: number;
   entriesCount: number;
+  forcePlaceholders: boolean;
+  imageRetryKey: string;
   loadedImageKeys: Set<string>;
-  onUpdate: (id: string, patch: Partial<MiniFigEntry>) => void;
   onRemove: (id: string) => void;
   onPreview: (id: string) => void;
   onHeightChange: (rowIndex: number, height: number) => void;
-  renderPlaceholders?: boolean;
 }
 
 function BinderGridRow({
@@ -183,17 +150,17 @@ function BinderGridRow({
   rowIndex,
   columnCount,
   entriesCount,
+  forcePlaceholders,
+  imageRetryKey,
   loadedImageKeys,
-  onUpdate,
   onRemove,
   onPreview,
   onHeightChange,
-  renderPlaceholders = false,
 }: BinderGridRowProps) {
   const rowRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
-    if (renderPlaceholders || !rowRef.current) return;
+    if (!rowRef.current) return;
 
     const element = rowRef.current;
     const measure = () => {
@@ -204,7 +171,7 @@ function BinderGridRow({
     measure();
     observer.observe(element);
     return () => observer.disconnect();
-  }, [onHeightChange, renderPlaceholders, rowIndex]);
+  }, [onHeightChange, rowIndex]);
 
   return (
     <div
@@ -214,66 +181,51 @@ function BinderGridRow({
         gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
       }}
     >
-      {entries.map((entry, columnIndex) =>
-        renderPlaceholders ? (
-          <article
-            className="creature-card binder-card-placeholder"
-            key={entry.id}
-            role="listitem"
-            aria-posinset={rowIndex * columnCount + columnIndex + 1}
-            aria-setsize={entriesCount}
-          >
-            <div className="binder-placeholder-art" />
-            <div className="binder-placeholder-body">
-              <strong>{entry.name}</strong>
-              <div className="binder-placeholder-controls" aria-hidden="true" />
-              <div className="binder-placeholder-controls" aria-hidden="true" />
-            </div>
-          </article>
-        ) : (
-          <CreatureBinderCard
-            entry={entry}
-            entryIndex={rowIndex * columnCount + columnIndex}
-            entriesCount={entriesCount}
-            key={entry.id}
-            loadedImageKeys={loadedImageKeys}
-            onPreview={onPreview}
-            onRemove={onRemove}
-            onUpdate={onUpdate}
-          />
-        ),
-      )}
+      {entries.map((entry, columnIndex) => (
+        <CreatureBinderCard
+          entry={entry}
+          entryIndex={rowIndex * columnCount + columnIndex}
+          entriesCount={entriesCount}
+          forcePlaceholders={forcePlaceholders}
+          imageRetryKey={imageRetryKey}
+          key={entry.id}
+          loadedImageKeys={loadedImageKeys}
+          onPreview={onPreview}
+          onRemove={onRemove}
+        />
+      ))}
     </div>
   );
 }
 
 interface BinderVirtualizedGridProps {
   entries: MiniFigEntry[];
+  forcePlaceholders: boolean;
+  imageRetryKey: string;
   height: number;
   isScrolling: boolean;
   onChildScroll: (params: { scrollTop: number }) => void;
   onPreview: (id: string) => void;
   onRemove: (id: string) => void;
-  onUpdate: (id: string, patch: Partial<MiniFigEntry>) => void;
   scrollTop: number;
   width: number;
 }
 
 function BinderVirtualizedGrid({
   entries,
+  forcePlaceholders,
+  imageRetryKey,
   height,
   isScrolling,
   onChildScroll,
   onPreview,
   onRemove,
-  onUpdate,
   scrollTop,
   width,
 }: BinderVirtualizedGridProps) {
   const listRef = useRef<List>(null);
   const loadedImageKeysRef = useRef(new Set<string>());
   const rowHeightsRef = useRef(new Map<number, number>());
-  const renderedRowsRef = useRef(new Set<number>());
   const needsEstimateRef = useRef(true);
   const [estimatedRowHeight, setEstimatedRowHeight] = useState(
     INITIAL_ROW_HEIGHT_ESTIMATE,
@@ -289,13 +241,16 @@ function BinderVirtualizedGrid({
     }
     return nextRows;
   }, [columnCount, entries]);
+  const rowLayoutKey = useMemo(
+    () => rows.map((row) => row.map((entry) => entry.id).join(",")).join(";"),
+    [rows],
+  );
 
   useLayoutEffect(() => {
     rowHeightsRef.current.clear();
-    renderedRowsRef.current.clear();
     needsEstimateRef.current = true;
     listRef.current?.recomputeRowHeights();
-  }, [columnCount, rows.length, width]);
+  }, [columnCount, rowLayoutKey, width]);
 
   useLayoutEffect(() => {
     listRef.current?.recomputeRowHeights();
@@ -334,30 +289,22 @@ function BinderVirtualizedGrid({
       role="presentation"
       rowCount={rows.length}
       rowHeight={getRowHeight}
-      rowRenderer={({ index, isScrolling: isRowScrolling, key, style }) => {
-        const renderPlaceholders =
-          isRowScrolling && !renderedRowsRef.current.has(index);
-        if (!renderPlaceholders) {
-          renderedRowsRef.current.add(index);
-        }
-
-        return (
-          <div key={key} role="presentation" style={style}>
-            <BinderGridRow
-              entries={rows[index]}
-              rowIndex={index}
-              columnCount={columnCount}
-              entriesCount={entries.length}
-              loadedImageKeys={loadedImageKeysRef.current}
-              onPreview={onPreview}
-              onRemove={onRemove}
-              onUpdate={onUpdate}
-              onHeightChange={handleRowHeightChange}
-              renderPlaceholders={renderPlaceholders}
-            />
-          </div>
-        );
-      }}
+      rowRenderer={({ index, key, style }) => (
+        <div key={key} role="presentation" style={style}>
+          <BinderGridRow
+            entries={rows[index]}
+            rowIndex={index}
+            columnCount={columnCount}
+            entriesCount={entries.length}
+            forcePlaceholders={forcePlaceholders}
+            imageRetryKey={imageRetryKey}
+            loadedImageKeys={loadedImageKeysRef.current}
+            onPreview={onPreview}
+            onRemove={onRemove}
+            onHeightChange={handleRowHeightChange}
+          />
+        </div>
+      )}
       scrollTop={scrollTop}
       width={width}
     />
@@ -366,9 +313,10 @@ function BinderVirtualizedGrid({
 
 export function CreatureBinder({
   entries,
+  forcePlaceholders,
+  imageRetryKey,
   sources,
   sourceFilter,
-  onUpdate,
   onRemove,
   onPreview,
   onAddCreature,
@@ -463,7 +411,10 @@ export function CreatureBinder({
               variant="outlined"
               size="small"
               onClick={onManageSources}
-              sx={{ borderRadius: "var(--radius-sm) 0 0 var(--radius-sm)" }}
+              sx={{
+                height: 40,
+                borderRadius: "var(--radius-sm) 0 0 var(--radius-sm)",
+              }}
             >
               Sources
             </Button>
@@ -476,6 +427,7 @@ export function CreatureBinder({
               aria-label="Refresh all sources"
               title={sources.length === 0 ? "Add a source first" : "Refresh all sources"}
               sx={{
+                height: 40,
                 minWidth: "2.45rem",
                 maxWidth: "2.45rem",
                 paddingInline: 0,
@@ -486,8 +438,13 @@ export function CreatureBinder({
               <span className={refreshing ? "refresh-icon spinning" : "refresh-icon"} aria-hidden="true">↻</span>
             </Button>
           </div>
-          <Button variant="contained" size="small" onClick={onAddCreature}>
-            + Add creature
+          <Button
+            variant="contained"
+            size="small"
+            sx={{ height: 40 }}
+            onClick={onAddCreature}
+          >
+            Add creature
           </Button>
         </div>
       </div>
@@ -504,16 +461,17 @@ export function CreatureBinder({
               <AutoSizer disableHeight>
                 {({ width }) => (
                   <BinderVirtualizedGrid
-                   entries={visibleEntries}
-                   height={height}
-                   isScrolling={isScrolling}
-                   onChildScroll={onChildScroll}
-                   onPreview={onPreview}
-                   onRemove={onRemove}
-                   onUpdate={onUpdate}
-                   scrollTop={scrollTop}
-                   width={width}
-                  />
+                     entries={visibleEntries}
+                     forcePlaceholders={forcePlaceholders}
+                     imageRetryKey={imageRetryKey}
+                     height={height}
+                     isScrolling={isScrolling}
+                     onChildScroll={onChildScroll}
+                     onPreview={onPreview}
+                     onRemove={onRemove}
+                     scrollTop={scrollTop}
+                     width={width}
+                   />
                 )}
               </AutoSizer>
             </div>

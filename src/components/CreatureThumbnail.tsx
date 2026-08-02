@@ -1,20 +1,21 @@
-import { useEffect, useRef, useState } from "react";
-import { Box, ButtonBase } from "@mui/material";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Box, ButtonBase, Tooltip } from "@mui/material";
 import {
   blurHashToDataUrl,
   createBlurHash,
   createBlurHashFromUrl,
 } from "../blurHash";
 import { getEntryImageSource } from "../generatePdf";
+import { DriveAuthError } from "../googleDrive";
 import { DriveCreatureImage } from "../driveImages";
 import type { MiniFigEntry } from "../types";
 
 interface Props {
   entry: MiniFigEntry;
   className?: string;
+  forcePlaceholder?: boolean;
   imageLoading?: "eager" | "lazy";
   interactive?: boolean;
-  showHint?: boolean;
   loadedImageKeys?: Set<string>;
   onPreview?: (id: string) => void;
   onBlurHash?: (id: string, blurHash: string) => void;
@@ -23,67 +24,67 @@ interface Props {
 export function CreatureThumbnail({
   entry,
   className = "",
+  forcePlaceholder = false,
   imageLoading = "lazy",
   interactive = true,
-  showHint = true,
   loadedImageKeys,
   onPreview,
   onBlurHash,
 }: Props) {
   const hasImage = Boolean(getEntryImageSource(entry) || entry.imageDriveFileId);
   const imageKey = getEntryImageSource(entry) || entry.imageDriveFileId || "";
-  const [loadedImageKey, setLoadedImageKey] = useState(() =>
+  const [settledImageKey, setSettledImageKey] = useState(() =>
     loadedImageKeys?.has(imageKey) ? imageKey : "",
   );
+  const [failedImageKey, setFailedImageKey] = useState("");
+  const [disconnectedDriveImageKey, setDisconnectedDriveImageKey] = useState("");
   const attemptedImageKeys = useRef(new Set<string>());
-  const settledLayers = useRef(new Map<string, Set<"backdrop" | "foreground">>());
   const currentImageKey = useRef(imageKey);
-  const revealFrame = useRef<number | null>(null);
 
   useEffect(() => {
     currentImageKey.current = imageKey;
-    return () => {
-      if (revealFrame.current !== null) {
-        cancelAnimationFrame(revealFrame.current);
-        revealFrame.current = null;
-      }
-    };
   }, [imageKey]);
 
   const isLoading =
     hasImage &&
-    loadedImageKey !== imageKey &&
-    !loadedImageKeys?.has(imageKey);
+    (forcePlaceholder || (
+      settledImageKey !== imageKey &&
+      failedImageKey !== imageKey &&
+      !loadedImageKeys?.has(imageKey)
+    ));
+  const hasFailed = !forcePlaceholder && failedImageKey === imageKey;
+  const hasLoaded = !isLoading && !hasFailed;
   const blurPlaceholder = entry.blurHash
     ? blurHashToDataUrl(entry.blurHash)
     : null;
+  const showBlurPlaceholder = Boolean(blurPlaceholder);
 
-  const revealImage = (loadedKey: string) => {
-    if (revealFrame.current !== null) cancelAnimationFrame(revealFrame.current);
-    revealFrame.current = requestAnimationFrame(() => {
-      revealFrame.current = requestAnimationFrame(() => {
-        revealFrame.current = null;
-        loadedImageKeys?.add(loadedKey);
-        setLoadedImageKey(loadedKey);
-      });
-    });
-  };
+  const revealImage = useCallback((loadedKey: string) => {
+    loadedImageKeys?.add(loadedKey);
+    setSettledImageKey(loadedKey);
+  }, [loadedImageKeys]);
 
-  const settleLayer = (
-    loadedKey: string,
-    layer: "backdrop" | "foreground",
-  ) => {
-    const layers = settledLayers.current.get(loadedKey) ?? new Set();
-    layers.add(layer);
-    settledLayers.current.set(loadedKey, layers);
-    if (layers.size === 2 && currentImageKey.current === loadedKey) {
-      revealImage(loadedKey);
+  const handleImageFailure = useCallback((failedKey: string) => {
+    if (currentImageKey.current === failedKey) {
+      setFailedImageKey(failedKey);
     }
-  };
+  }, []);
+  const handleSourceFailure = useCallback(
+    (error: unknown) => {
+      if (error instanceof DriveAuthError) {
+        setDisconnectedDriveImageKey(imageKey);
+      }
+      handleImageFailure(imageKey);
+    },
+    [handleImageFailure, imageKey],
+  );
+  const isDriveDisconnected = disconnectedDriveImageKey === imageKey;
 
-  const handleImageLoad = async (image: HTMLImageElement) => {
-    const loadedKey = imageKey;
-    settleLayer(loadedKey, "foreground");
+  const handleImageLoad = async (
+    image: HTMLImageElement,
+    loadedKey: string,
+  ) => {
+    revealImage(loadedKey);
     if (entry.blurHash || attemptedImageKeys.current.has(loadedKey) || !onBlurHash) {
       return;
     }
@@ -100,9 +101,9 @@ export function CreatureThumbnail({
       {hasImage ? (
         <>
           <span
-            className={`creature-thumbnail-placeholder ${blurPlaceholder ? "has-blurhash" : "is-neutral"}${isLoading ? "" : " is-loaded"}`}
+            className={`creature-thumbnail-placeholder ${showBlurPlaceholder ? "has-blurhash" : "is-neutral"}${hasLoaded ? " is-loaded" : ""}${hasFailed ? " is-failed" : ""}`}
             role={isLoading ? "status" : undefined}
-            style={blurPlaceholder
+            style={showBlurPlaceholder
               ? { backgroundImage: `url(${blurPlaceholder})` }
               : undefined}
           >
@@ -110,31 +111,46 @@ export function CreatureThumbnail({
               <span className="sr-only">Loading {entry.name || "creature"} image</span>
             )}
           </span>
-          <DriveCreatureImage
-            entry={entry}
-            className="creature-art-backdrop"
-            alt=""
-            aria-hidden="true"
-            decoding="async"
-            loading={imageLoading}
-            onLoad={() => settleLayer(imageKey, "backdrop")}
-            onError={() => settleLayer(imageKey, "backdrop")}
-          />
-          <DriveCreatureImage
-            entry={entry}
-            className="creature-art-foreground"
-            alt=""
-            decoding="async"
-            loading={imageLoading}
-            onLoad={(event) => void handleImageLoad(event.currentTarget)}
-            onError={() => settleLayer(imageKey, "foreground")}
-          />
+          {!forcePlaceholder && (
+            <>
+              <DriveCreatureImage
+                entry={entry}
+                className="creature-art-backdrop"
+                alt=""
+                aria-hidden="true"
+                decoding="async"
+                loading={imageLoading}
+                onSourceError={handleSourceFailure}
+              />
+              <DriveCreatureImage
+                entry={entry}
+                className="creature-art-foreground"
+                alt=""
+                decoding="async"
+                loading={imageLoading}
+                onImageReady={(image, loadedKey) =>
+                  void handleImageLoad(image, loadedKey)}
+                onError={() => handleImageFailure(imageKey)}
+                onSourceError={handleSourceFailure}
+              />
+            </>
+          )}
+          {isDriveDisconnected && !forcePlaceholder && (
+            <Tooltip title="Connect with Drive">
+              <span
+                className="creature-thumbnail-drive-error"
+                aria-label="Connect with Drive"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v6m0 4h.01" />
+                </svg>
+              </span>
+            </Tooltip>
+          )}
         </>
       ) : (
         <span className="creature-thumbnail-empty" aria-hidden="true">◇</span>
-      )}
-      {showHint && (
-        <span className="preview-hint" aria-hidden="true">Preview print</span>
       )}
     </>
   );
@@ -158,7 +174,7 @@ export function CreatureThumbnail({
       className={rootClassName}
       component="button"
       onClick={() => onPreview?.(entry.id)}
-      aria-label={`Preview ${entry.name || "creature"} export`}
+      aria-label={`${isDriveDisconnected ? "Google Drive is disconnected. " : ""}Preview ${entry.name || "creature"} export`}
       aria-busy={isLoading || undefined}
     >
       {content}

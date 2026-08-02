@@ -15,6 +15,42 @@
   margin-bottom: 2.5rem;
 }
 
+.header-navigation {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.debug-menu-button {
+  position: fixed !important;
+  z-index: 1401;
+  bottom: 1rem;
+  left: 1rem;
+  width: 2.35rem;
+  height: 2.35rem;
+  color: var(--text-muted) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 999px !important;
+  background: var(--surface) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+}
+
+.debug-menu-button:hover,
+.debug-menu-button:focus-visible {
+  color: var(--text) !important;
+  border-color: var(--accent) !important;
+}
+
+.debug-menu-button svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.75;
+}
+
 .app-header h1 {
   font-size: 1.75rem;
   font-weight: 700;
@@ -1183,10 +1219,35 @@
 }
 
 .creature-card {
+  position: relative;
   overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+}
+
+.binder-card-menu-button {
+  position: absolute !important;
+  z-index: 2;
+  top: 0.45rem;
+  right: 0.45rem;
+  color: white !important;
+  background: rgba(0, 0, 0, 0.58) !important;
+}
+
+.binder-card-menu-button:hover,
+.binder-card-menu-button:focus-visible {
+  background: rgba(0, 0, 0, 0.8) !important;
+}
+
+.binder-card-menu-button svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: currentColor;
+}
+
+.binder-remove-menu-item {
+  color: var(--danger) !important;
 }
 
 .creature-thumbnail {
@@ -1240,15 +1301,31 @@
   overflow: hidden;
   background: var(--surface-hover);
   background-position: center;
+  background-repeat: no-repeat;
   background-size: cover;
   opacity: 1;
   pointer-events: none;
   z-index: 2;
-  transition: opacity 450ms ease-in-out;
+  transition:
+    opacity 450ms ease-in-out,
+    transform 420ms cubic-bezier(0.2, 0.75, 0.25, 1);
 }
 
 .creature-thumbnail-placeholder.is-loaded {
   opacity: 0;
+}
+
+.creature-thumbnail-placeholder.is-failed {
+  background:
+    linear-gradient(135deg, rgba(239, 68, 68, 0.14), transparent),
+    var(--surface-hover);
+  background-repeat: no-repeat;
+}
+
+.creature-thumbnail-placeholder.has-blurhash.is-failed {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 .creature-thumbnail-placeholder.is-neutral::after,
@@ -1258,6 +1335,36 @@
   content: "";
   transform: translateX(-100%);
   animation: creature-thumbnail-shimmer 1.4s ease-in-out infinite;
+}
+
+.creature-thumbnail-placeholder.is-failed::after {
+  animation: none;
+  background: none;
+}
+
+.creature-thumbnail-drive-error {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  display: grid;
+  width: 1.6rem;
+  height: 1.6rem;
+  z-index: 3;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 50%;
+  color: white;
+  background: rgba(127, 29, 29, 0.92);
+  place-items: center;
+}
+
+.creature-thumbnail-drive-error svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .creature-thumbnail-placeholder.is-neutral::after,
@@ -1313,33 +1420,18 @@
   transform: scale(1.045);
 }
 
-.preview-hint {
-  position: absolute;
-  right: 50%;
-  bottom: 0.7rem;
-  padding: 0.3rem 0.6rem;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  color: white;
-  background: rgba(15, 17, 23, 0.82);
-  font-size: 0.67rem;
-  font-weight: 700;
-  opacity: 0;
-  z-index: 2;
-  transform: translate(50%, 5px);
-  transition: opacity 0.15s, transform 0.15s;
+.creature-thumbnail-placeholder.has-blurhash {
+  transform: scale(1);
 }
 
-.creature-preview-trigger:hover .preview-hint,
-.creature-preview-trigger:focus-visible .preview-hint {
-  opacity: 1;
-  transform: translate(50%, 0);
+.creature-preview-trigger:hover .creature-thumbnail-placeholder.has-blurhash,
+.creature-preview-trigger:focus-visible .creature-thumbnail-placeholder.has-blurhash {
+  transform: scale(1.045);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .creature-thumbnail img,
-  .creature-thumbnail-placeholder,
-  .preview-hint {
+  .creature-thumbnail-placeholder {
     transition: none;
   }
 
@@ -1348,32 +1440,96 @@
   }
 }
 
-.export-preview-backdrop {
+.creature-preview-backdrop {
   z-index: 1100;
   overscroll-behavior: contain;
 }
 
-.app-dialog.export-preview-dialog {
-  width: min(680px, calc(100vw - 2rem));
+.app-dialog.creature-preview-dialog {
+  width: min(980px, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
   overflow: auto;
+  background: var(--surface);
 }
 
-.export-preview-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+.creature-preview-workspace {
+  display: grid;
+  grid-template-columns: minmax(205px, 0.4fr) minmax(0, 1fr);
+}
+
+.creature-preview-sidebar {
+  display: grid;
+  align-content: start;
   gap: 1rem;
-  margin-bottom: 1rem;
+  padding-right: var(--modal-padding);
+  border-right: 1px solid var(--border);
+  background: var(--surface);
 }
 
-.export-preview-header p,
-.export-preview-help {
+.creature-preview-content {
+  min-width: 0;
+  padding-left: var(--modal-padding);
+}
+
+.creature-preview-name,
+.creature-preview-select {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.creature-preview-name > span,
+.creature-preview-select > span {
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.export-preview-stage {
+.creature-preview-name input,
+.creature-preview-select select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: 0;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.creature-preview-name input:focus,
+.creature-preview-select select:focus {
+  border-color: var(--accent);
+}
+
+.creature-preview-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.creature-preview-checkbox input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.creature-preview-header {
+  padding-bottom: var(--modal-padding);
+}
+
+.creature-preview-header h2 {
+  margin: 0;
+}
+
+.creature-preview-stage {
   position: relative;
   display: grid;
   place-items: center;
@@ -1382,44 +1538,13 @@
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background:
-    linear-gradient(45deg, rgba(255,255,255,0.035) 25%, transparent 25%),
-    linear-gradient(-45deg, rgba(255,255,255,0.035) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.035) 75%),
-    linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.035) 75%),
-    #090b10;
-  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
-  background-size: 16px 16px;
+  background: #090b10;
 }
 
-.preview-mode-picker {
-  position: absolute;
-  right: 0.75rem;
-  bottom: 0.75rem;
-  gap: 0.25rem;
-  padding: 0.25rem 0.55rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: rgba(15, 17, 23, 0.9);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(6px);
-}
-
-.preview-mode-picker .MuiFormControlLabel-root {
-  margin: 0;
-}
-
-.preview-mode-picker .MuiFormControlLabel-label {
-  padding-right: 0.35rem;
-  font-size: 0.72rem;
-}
-
-.export-preview-stage img {
-  display: block;
-  max-width: 100%;
-  max-height: min(65vh, 680px);
-  object-fit: contain;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+.creature-preview-loading {
+  display: grid;
+  place-items: center;
+  color: var(--accent);
 }
 
 .miniature-3d-scene {
@@ -1526,16 +1651,7 @@
   .miniature-3d-figure.show-rotation-nudge {
     animation: none;
   }
-}
 
-.preview-loading {
-  color: var(--text-muted);
-  font-size: 0.82rem;
-}
-
-.export-preview-help {
-  margin-top: 0.9rem;
-  text-align: center;
 }
 
 .creature-card-body {
@@ -1544,133 +1660,14 @@
   padding: 0.9rem;
 }
 
-.binder-creature-name {
-  width: 100%;
+.binder-creature-title {
+  display: block;
   min-width: 0;
-  padding: 0.25rem 0 0.35rem;
-  color: var(--text);
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid var(--border);
-  border-radius: 0;
-  outline: 0;
-  font: inherit;
-  font-size: 1rem;
-  font-weight: 650;
-}
-
-.binder-creature-name:focus {
-  border-bottom-color: var(--accent);
-  box-shadow: 0 1px 0 var(--accent);
-}
-
-.creature-settings {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.6rem;
-}
-
-.binder-card-select {
-  position: relative;
-  min-width: 0;
-}
-
-.binder-card-select > span {
-  position: absolute;
-  z-index: 1;
-  top: -0.42rem;
-  left: 0.65rem;
-  padding-inline: 0.22rem;
-  color: var(--text-muted);
-  background: var(--surface);
-  font-size: 0.72rem;
-  line-height: 1;
-  pointer-events: none;
-}
-
-.binder-card-select select {
-  width: 100%;
-  min-width: 0;
-  padding: 0.55rem 0.65rem;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  outline: 0;
-  font: inherit;
-  font-size: 0.85rem;
-}
-
-.binder-card-select select:focus {
-  border-color: var(--accent);
-}
-
-.binder-card-checkbox {
-  display: inline-flex;
-  width: fit-content;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--text-muted);
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-
-.binder-card-checkbox input {
-  width: 1rem;
-  height: 1rem;
-  margin: 0;
-  accent-color: var(--accent);
-}
-
-.creature-card-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.binder-remove-button {
-  padding: 0.35rem 0.7rem;
-  color: #f87171;
-  background: transparent;
-  border: 1px solid rgba(239, 68, 68, 0.5);
-  border-radius: var(--radius-sm);
-  font: inherit;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.binder-remove-button:hover,
-.binder-remove-button:focus-visible {
-  color: white;
-  background: var(--danger);
-  border-color: var(--danger);
-}
-
-.binder-card-placeholder {
-  min-height: 390px;
-}
-
-.binder-placeholder-art {
-  height: 210px;
-  background: var(--bg);
-}
-
-.binder-placeholder-body {
-  display: grid;
-  gap: 0.9rem;
-  padding: 0.9rem;
-}
-
-.binder-placeholder-body strong {
   overflow: hidden;
+  padding-right: 1.8rem;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.binder-placeholder-controls {
-  height: 2.35rem;
-  background: var(--surface-hover);
-  border-radius: var(--radius-sm);
+  font-size: 1rem;
 }
 
 .btn-danger-ghost {
@@ -1905,7 +1902,6 @@
   gap: 0.85rem;
   padding: 0.55rem;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
   background: var(--bg);
 }
 
@@ -1917,7 +1913,7 @@
 .print-creature-thumbnail {
   width: 64px;
   height: 64px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
 }
 
 .print-creature-info {
@@ -2005,8 +2001,91 @@
   margin: 1.25rem 0;
 }
 
-.export-button {
+.export-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.export-action-button {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.export-action-button:hover,
+.export-action-button:focus-visible {
+  border-color: var(--accent);
+  color: white;
+  background: var(--accent);
+}
+
+.export-action-button.Mui-disabled {
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+.export-action-button svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.app-dialog.print-sheet-preview-dialog {
+  width: min(1120px, calc(100vw - 2rem));
+  height: min(860px, calc(100vh - 2rem));
+  overflow: hidden;
+}
+
+.print-sheet-preview {
+  display: grid;
+  height: 100%;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.print-sheet-preview-header h2 {
+  margin: 0.2rem 0;
+  font-size: 1.3rem;
+}
+
+.print-sheet-preview-header p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.print-sheet-preview-stage {
+  display: grid;
+  min-height: 0;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.print-sheet-preview-loading {
+  display: grid;
+  justify-items: center;
+  gap: 0.8rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.print-sheet-preview-frame {
   width: 100%;
+  height: 100%;
+  border: 0;
+  background: white;
 }
 
 /* --- Dialogs and HTML sources --- */
@@ -2023,15 +2102,21 @@
 }
 
 .app-dialog {
+  --modal-padding: 1.25rem;
   position: relative;
   width: min(960px, 100%);
   max-height: calc(100vh - 2rem);
-  padding: 1.3rem;
+  padding: var(--modal-padding);
   overflow-y: auto;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 4px);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+}
+
+/* Google Picker uses a lower default layer than MUI dialogs. */
+.picker {
+  z-index: 1400 !important;
 }
 
 .creature-dialog .add-creature-panel {
@@ -2043,7 +2128,7 @@
 .app-dialog.creature-dialog,
 .app-dialog.source-dialog,
 .app-dialog.quick-add-dialog,
-.app-dialog.export-preview-dialog,
+.app-dialog.creature-preview-dialog,
 .app-dialog.rename-catalogue-dialog {
   background:
     radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.14), transparent 34%),
@@ -2100,13 +2185,13 @@
 
 .dialog-close.modal-shell-close {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
+  top: var(--modal-padding);
+  right: var(--modal-padding);
   z-index: 5;
 }
 
 .dialog-heading,
-.export-preview-header,
+.creature-preview-header,
 .quick-add-header,
 .creature-dialog .panel-heading {
   padding-right: 2.75rem;
@@ -2124,10 +2209,10 @@
 }
 
 .drive-source-setup {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(180px, 1.4fr) auto;
+  align-items: end;
+  gap: 0.7rem;
   margin-top: 1rem;
   padding: 1rem;
   color: var(--text-muted);
@@ -2139,15 +2224,46 @@
 
 .drive-source-copy {
   display: grid;
-  flex: 1;
+  grid-column: 1 / -1;
   gap: 0.7rem;
 }
 
-.drive-source-name {
-  width: min(320px, 100%);
+.drive-folder-field {
+  min-width: 0;
+}
+
+.drive-folder-field:not(.Mui-disabled) .MuiOutlinedInput-root,
+.drive-folder-field:not(.Mui-disabled) .MuiOutlinedInput-input {
+  cursor: pointer;
+}
+
+.source-field-error {
+  display: grid;
+  width: 1rem;
+  height: 1rem;
+  color: #f87171;
+  cursor: help;
+  place-items: center;
+  outline: none;
+}
+
+.source-field-error:focus-visible {
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.source-field-error svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .source-requirement {
+  grid-column: 1 / -1;
   color: #fde68a;
 }
 
@@ -2157,6 +2273,16 @@
   align-items: end;
   gap: 0.7rem;
   margin-top: 1.2rem;
+  padding: 1rem;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+}
+
+.source-form .dialog-intro {
+  grid-column: 1 / -1;
 }
 
 .dialog-form-actions {
@@ -2216,7 +2342,7 @@
 }
 
 .saved-sources h3 {
-  font-size: 0.85rem;
+  font-size: 1.2rem;
 }
 
 .saved-source {
@@ -2271,11 +2397,35 @@
 }
 
 @media (max-width: 900px) {
+  .creature-preview-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .creature-preview-sidebar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: end;
+    padding: 0 0 var(--modal-padding);
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .creature-preview-sidebar > .eyebrow {
+    grid-column: 1 / -1;
+  }
+
+  .creature-preview-content {
+    padding: var(--modal-padding) 0 0;
+  }
+
   .add-creature-grid {
     grid-template-columns: 1fr 1fr;
   }
 
   .source-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .drive-source-setup {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -2305,6 +2455,11 @@
 }
 
 @media (max-width: 640px) {
+  .debug-menu-button {
+    bottom: 0.85rem;
+    left: 0.85rem;
+  }
+
   .toast-viewport {
     right: 0.85rem;
     bottom: 0.85rem;
@@ -2372,7 +2527,7 @@
 
   .drive-source-setup {
     align-items: stretch;
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
 
   .saved-source > div:last-child .btn {

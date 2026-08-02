@@ -25,6 +25,7 @@ import type {
   PrintableMiniFigEntry,
   PrintCatalogue,
   PrintLayout,
+  MiniSize,
 } from "../types";
 import { AppModal } from "./AppModal";
 import { CreatureSearch } from "./CreatureSearch";
@@ -49,6 +50,7 @@ interface Props {
   activePrintCatalogueId: string | null;
   paperFormat: PaperFormat;
   printLayout: PrintLayout;
+  miniSize: MiniSize;
   generating: boolean;
   exportError: string;
   onQuantityChange: (id: string, quantity: number) => void;
@@ -58,6 +60,8 @@ interface Props {
   onClearSelection: () => void;
   onPaperFormatChange: (format: PaperFormat) => void;
   onPrintLayoutChange: (layout: PrintLayout) => void;
+  onMiniSizeChange: (size: MiniSize) => void;
+  onPrint: () => void;
   onGenerate: () => void;
   onCreatePrintCatalogue: (name: string) => void;
   onSelectPrintCatalogue: (id: string | null) => void;
@@ -71,6 +75,7 @@ export function PrintBuilder({
   activePrintCatalogueId,
   paperFormat,
   printLayout,
+  miniSize,
   generating,
   exportError,
   onQuantityChange,
@@ -80,6 +85,8 @@ export function PrintBuilder({
   onClearSelection,
   onPaperFormatChange,
   onPrintLayoutChange,
+  onMiniSizeChange,
+  onPrint,
   onGenerate,
   onCreatePrintCatalogue,
   onSelectPrintCatalogue,
@@ -204,13 +211,12 @@ export function PrintBuilder({
                     className="print-creature-thumbnail"
                     entry={entry}
                     imageLoading="eager"
-                    showHint={false}
                     onPreview={onPreview}
                     onBlurHash={onBlurHash}
                   />
                   <div className="print-creature-info">
                     <strong>{entry.name || "Unnamed creature"}</strong>
-                    <span>{entry.creatureSize} · {entry.miniSize}mm</span>
+                    <span>{entry.creatureSize}</span>
                   </div>
                   <ButtonGroup
                     className="quantity-stepper"
@@ -515,6 +521,25 @@ export function PrintBuilder({
         </div>
 
         <div className="paper-format-control">
+          <span>Print scale</span>
+          <ToggleButtonGroup
+            exclusive
+            fullWidth
+            size="small"
+            color="primary"
+            value={miniSize}
+            onChange={(_, size: MiniSize | null) => {
+              if (size) onMiniSizeChange(size);
+            }}
+            aria-label="Print scale"
+          >
+            {([24, 28, 32] as MiniSize[]).map((size) => (
+              <ToggleButton key={size} value={size}>{size}mm</ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+        </div>
+
+        <div className="paper-format-control">
           <span>Page layout</span>
           <ToggleButtonGroup
             exclusive
@@ -540,16 +565,38 @@ export function PrintBuilder({
         </div>
 
         {exportError && <Alert severity="error">{exportError}</Alert>}
-        <Button
-          className="export-button"
-          variant="contained"
-          size="large"
-          onClick={onGenerate}
-          disabled={generating || total === 0}
-          startIcon={generating ? <CircularProgress size={18} color="inherit" /> : undefined}
-        >
-          {generating ? "Generating PDF…" : "Export PDF"}
-        </Button>
+        <div className="export-actions" role="group" aria-label="Export actions">
+          <IconButton
+            className="export-action-button"
+            aria-label="Print sheet"
+            title="Print sheet"
+            onClick={onPrint}
+            disabled={generating || total === 0}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 9V3h12v6" />
+              <path d="M6 17H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
+              <path d="M6 14h12v7H6z" />
+            </svg>
+          </IconButton>
+          <IconButton
+            className="export-action-button"
+            aria-label={generating ? "Generating PDF" : "Download PDF"}
+            title={generating ? "Generating PDF" : "Download PDF"}
+            onClick={onGenerate}
+            disabled={generating || total === 0}
+          >
+            {generating ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : (
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3v12" />
+                <path d="m7 10 5 5 5-5" />
+                <path d="M5 21h14" />
+              </svg>
+            )}
+          </IconButton>
+        </div>
         </section>
       </aside>
     </div>

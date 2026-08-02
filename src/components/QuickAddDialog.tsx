@@ -13,6 +13,7 @@ interface Props {
 
 export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
   const resultsListRef = useRef<List>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [announcement, setAnnouncement] = useState("");
@@ -42,6 +43,7 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
   };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.defaultPrevented) return;
     if (event.nativeEvent.isComposing) return;
 
     if (event.key === "ArrowDown") {
@@ -70,6 +72,7 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
       className="quick-add-dialog"
       backdropClassName="quick-add-backdrop"
       ariaLabel="Quick add creatures"
+      onEntered={() => searchInputRef.current?.focus()}
       onKeyDown={handleKeyDown}
       onClose={onClose}
     >
@@ -84,6 +87,7 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
           className="quick-add-search"
           type="search"
           value={query}
+          inputRef={searchInputRef}
           onChange={(event) => {
             setQuery(event.target.value);
             setSelectedIndex(0);
@@ -106,6 +110,7 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
               "aria-autocomplete": "list",
               "aria-controls": "quick-add-results",
               "aria-activedescendant": activeOptionId,
+              onKeyDown: handleKeyDown,
             },
           }}
         />
@@ -154,11 +159,10 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
                           entry={entry}
                           imageLoading="eager"
                           interactive={false}
-                          showHint={false}
                         />
                         <span className="quick-add-result-copy">
                           <strong>{entry.name || "Unnamed creature"}</strong>
-                          <small>{entry.creatureSize} · {entry.miniSize}mm</small>
+                          <small>{entry.creatureSize}</small>
                         </span>
                         <span className="quick-add-count">
                           {entry.quantity ? `${entry.quantity} selected` : "Add"}

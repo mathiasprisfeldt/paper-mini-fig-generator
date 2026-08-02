@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -89,6 +90,7 @@ function useLazyEntryImageSource(
   entry: MiniFigEntry,
   targetRef: RefObject<HTMLImageElement | null>,
   eager: boolean,
+  onSourceError?: (error: unknown) => void,
 ): string | null {
   const directSource = entry.imageDataUrl || entry.imageUrl;
   const context = useContext(DriveImageContext);
@@ -148,13 +150,13 @@ function useLazyEntryImageSource(
           });
         }
       })
-      .catch(() => {
-        // Leave the placeholder visible; reconnecting creates a new loader.
+      .catch((error: unknown) => {
+        if (active) onSourceError?.(error);
       });
     return () => {
       active = false;
     };
-  }, [context, directSource, eager, entry.imageDriveFileId, visible]);
+  }, [context, directSource, eager, entry.imageDriveFileId, onSourceError, visible]);
 
   if (directSource) return directSource;
   if (
@@ -168,21 +170,62 @@ function useLazyEntryImageSource(
 
 interface DriveCreatureImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   entry: MiniFigEntry;
+  onSourceError?: (error: unknown) => void;
+  onImageReady?: (image: HTMLImageElement, imageKey: string) => void;
 }
 
 export function DriveCreatureImage({
   entry,
   loading = "lazy",
+  onSourceError,
+  onImageReady,
+  onLoad,
+  onError,
   ...imageProps
 }: DriveCreatureImageProps) {
   const imageRef = useRef<HTMLImageElement>(null);
-  const source = useLazyEntryImageSource(entry, imageRef, loading === "eager");
+  const source = useLazyEntryImageSource(
+    entry,
+    imageRef,
+    loading === "eager",
+    onSourceError,
+  );
+  const imageKey = entry.imageDataUrl || entry.imageUrl || entry.imageDriveFileId || "";
+
+  useLayoutEffect(() => {
+    const image = imageRef.current;
+    if (!source || !image?.complete) return;
+
+    if (image.naturalWidth > 0) {
+      onImageReady?.(image, imageKey);
+    }
+  }, [imageKey, onImageReady, source]);
+
+  useEffect(() => {
+    if (!source) return;
+
+    const timer = window.setTimeout(() => {
+      const image = imageRef.current;
+      if (image?.complete && image.naturalWidth > 0) {
+        onImageReady?.(image, imageKey);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [imageKey, onImageReady, source]);
+
   return (
     <img
       {...imageProps}
       ref={imageRef}
       src={source ?? undefined}
       loading={loading}
+      onLoad={(event) => {
+        onLoad?.(event);
+        onImageReady?.(event.currentTarget, imageKey);
+      }}
+      onError={(event) => {
+        onError?.(event);
+      }}
     />
   );
 }

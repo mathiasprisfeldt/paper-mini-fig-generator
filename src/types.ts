@@ -20,7 +20,6 @@ export interface MiniFigEntry {
   blurHash: string | null;
   sourceId: string | null;
   showName: boolean;
-  miniSize: MiniSize;
   creatureSize: CreatureSize;
 }
 
@@ -39,6 +38,7 @@ export interface PrintCatalogue {
   entries: PrintCatalogueEntry[];
   paperFormat: PaperFormat;
   printLayout: PrintLayout;
+  miniSize: MiniSize;
   createdAt: number;
   updatedAt: number;
 }

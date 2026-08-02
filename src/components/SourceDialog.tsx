@@ -4,11 +4,16 @@ import {
   AlertTitle,
   Button,
   CircularProgress,
+  InputAdornment,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
 } from "@mui/material";
-import { openDriveFolderPicker } from "../googleDrive";
+import {
+  openDriveFolderPicker,
+  type PickedDriveFolder,
+} from "../googleDrive";
 import type {
   CreatureSource,
   DriveCreatureSource,
@@ -36,6 +41,42 @@ interface Props {
   onClose: () => void;
 }
 
+function normalizeSourceUrl(value: string): string | null {
+  try {
+    const parsed = new URL(value.trim());
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
+      ? parsed.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function isValidCssSelector(value: string): boolean {
+  if (!value.trim()) return false;
+  try {
+    document.querySelector(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function FieldErrorAdornment({ message }: { message: string }) {
+  return (
+    <InputAdornment position="end" disablePointerEvents={false}>
+      <Tooltip title={message} describeChild>
+        <span className="source-field-error" tabIndex={0} aria-label={message}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v6m0 4h.01" />
+          </svg>
+        </span>
+      </Tooltip>
+    </InputAdornment>
+  );
+}
+
 export function SourceDialog({
   sources,
   accessToken,
@@ -53,7 +94,12 @@ export function SourceDialog({
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [selector, setSelector] = useState("");
+  const [urlTouched, setUrlTouched] = useState(false);
+  const [selectorTouched, setSelectorTouched] = useState(false);
+  const [selectedDriveFolder, setSelectedDriveFolder] =
+    useState<PickedDriveFolder | null>(null);
   const [busySourceId, setBusySourceId] = useState<string | null>(null);
+  const [isDrivePickerOpen, setIsDrivePickerOpen] = useState(false);
   const [renamingSourceId, setRenamingSourceId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [message, setMessage] = useState("");
@@ -66,17 +112,18 @@ export function SourceDialog({
     setShowCorsHelp(false);
   };
 
+  const normalizedUrl = normalizeSourceUrl(url);
+  const selectorIsValid = isValidCssSelector(selector);
+  const canAddHtml = Boolean(normalizedUrl && selectorIsValid);
+  const showUrlError = urlTouched && Boolean(url.trim()) && !normalizedUrl;
+  const showSelectorError =
+    selectorTouched && Boolean(selector.trim()) && !selectorIsValid;
+
   const handleAddHtml = async () => {
     resetFeedback();
-    let normalizedUrl: string;
-    try {
-      normalizedUrl = new URL(url.trim()).toString();
-    } catch {
-      setError("Enter a complete source URL, including https://");
-      return;
-    }
-    if (!selector.trim()) {
-      setError("Enter a CSS selector, such as a[href].");
+    setUrlTouched(true);
+    setSelectorTouched(true);
+    if (!normalizedUrl || !selectorIsValid) {
       return;
     }
 
@@ -105,6 +152,7 @@ export function SourceDialog({
       return;
     }
     setBusySourceId("new");
+    setIsDrivePickerOpen(true);
     try {
       const folder = await openDriveFolderPicker({
         accessToken,
@@ -113,22 +161,43 @@ export function SourceDialog({
         origin: window.location.origin,
       });
       if (!folder) return;
+      setSelectedDriveFolder(folder);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not choose the Drive folder.");
+    } finally {
+      setIsDrivePickerOpen(false);
+      setBusySourceId(null);
+    }
+  };
+
+  const handleAddDriveFolder = async () => {
+    resetFeedback();
+    if (!selectedDriveFolder) {
+      setError("Choose a Google Drive folder first.");
+      return;
+    }
+
+    setBusySourceId("new");
+    try {
       const count = await onAdd({
         type: "drive",
-        name: name.trim() || folder.name,
-        folderId: folder.id,
-        folderName: folder.name,
+        name: name.trim() || selectedDriveFolder.name,
+        folderId: selectedDriveFolder.id,
+        folderName: selectedDriveFolder.name,
       });
       setMessage(count === 0
         ? "Drive folder added. It is empty; refresh the source after adding images."
         : `Drive folder added with ${count} creature${count === 1 ? "" : "s"}.`);
       setName("");
+      setSelectedDriveFolder(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not read the Drive folder.");
     } finally {
       setBusySourceId(null);
     }
   };
+
+  const canPickDriveFolder = Boolean(accessToken && pickerConfigured);
 
   const handleRefresh = async (source: CreatureSource) => {
     setBusySourceId(source.id);
@@ -183,12 +252,13 @@ export function SourceDialog({
     <AppModal
       className="source-dialog"
       ariaLabelledBy="source-dialog-title"
+      disableEnforceFocus={isDrivePickerOpen}
       onClose={onClose}
     >
         <div className="dialog-heading">
           <div>
             <span className="eyebrow">Creature libraries</span>
-            <h2 id="source-dialog-title">Sources</h2>
+            <h2 id="source-dialog-title">Add source</h2>
           </div>
         </div>
 
@@ -200,6 +270,8 @@ export function SourceDialog({
           onChange={(_, value: "html" | "drive" | null) => {
             if (!value) return;
             setSourceType(value);
+            setUrlTouched(false);
+            setSelectorTouched(false);
             resetFeedback();
           }}
           aria-label="Source type"
@@ -214,13 +286,55 @@ export function SourceDialog({
 
         {sourceType === "html" ? (
           <>
-            <p className="dialog-intro">Add a directory page and select its image links with a CSS selector.</p>
             <div className="source-form">
+              <p className="dialog-intro">Add a directory page and select its image links with a CSS selector.</p>
               <TextField size="small" label="Source name" value={name} onChange={(event) => setName(event.target.value)} placeholder="My D&D artwork" />
-              <TextField className="source-url-field" size="small" label="Page URL" type="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://example.com/creatures/" />
-              <TextField size="small" label="HTML selector" value={selector} onChange={(event) => setSelector(event.target.value)} placeholder="a[href]" />
-              <Button variant="contained" onClick={handleAddHtml} disabled={busySourceId !== null} startIcon={busySourceId === "new" ? <CircularProgress size={16} color="inherit" /> : undefined}>
-                {busySourceId === "new" ? "Reading source…" : "Add HTML source"}
+              <TextField
+                className="source-url-field"
+                size="small"
+                label="Page URL"
+                type="url"
+                required
+                value={url}
+                onChange={(event) => {
+                  setUrl(event.target.value);
+                  setError("");
+                  setShowCorsHelp(false);
+                }}
+                onBlur={() => setUrlTouched(true)}
+                error={showUrlError}
+                slotProps={{
+                  input: {
+                    endAdornment: showUrlError
+                      ? <FieldErrorAdornment message="Enter a complete http(s) URL." />
+                      : undefined,
+                  },
+                }}
+                placeholder="https://example.com/creatures/"
+              />
+              <TextField
+                size="small"
+                label="HTML selector"
+                required
+                value={selector}
+                onChange={(event) => {
+                  setSelector(event.target.value);
+                  setError("");
+                  setShowCorsHelp(false);
+                }}
+                onBlur={() => setSelectorTouched(true)}
+                error={showSelectorError}
+                slotProps={{
+                  input: {
+                    endAdornment: showSelectorError
+                      ? <FieldErrorAdornment message="Enter a valid CSS selector." />
+                      : undefined,
+                  },
+                }}
+                placeholder="a[href]"
+              />
+              <Button variant="contained" onClick={handleAddHtml} disabled={!canAddHtml || busySourceId !== null} startIcon={busySourceId === "new" ? <CircularProgress size={16} color="inherit" /> : undefined}>
+                {busySourceId === "new" ? "Reading source…" : "Add"}
               </Button>
             </div>
             <p className="form-help">
@@ -231,8 +345,29 @@ export function SourceDialog({
           <div className="drive-source-setup">
             <div className="drive-source-copy">
               <p>Select one folder from your Google Drive. Image files directly inside it become creatures in the binder.</p>
-              <TextField className="drive-source-name" size="small" label="Source name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Defaults to the folder name" />
             </div>
+            <TextField size="small" label="Source name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Defaults to the folder name" />
+            <TextField
+              className="drive-folder-field"
+              size="small"
+              label="Drive folder"
+              required
+              value={selectedDriveFolder?.name ?? ""}
+              placeholder="Choose a folder"
+              disabled={!canPickDriveFolder || busySourceId !== null}
+              onClick={() => { void handleChooseDriveFolder(); }}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                void handleChooseDriveFolder();
+              }}
+              slotProps={{
+                input: {
+                  readOnly: true,
+                  "aria-haspopup": "dialog",
+                },
+              }}
+            />
             {!accessToken ? (
               <Alert className="source-requirement" severity="info">
                 Connect Google Drive above before choosing a folder.
@@ -242,8 +377,8 @@ export function SourceDialog({
                 Drive folder sources require the Google Picker app ID and API key in this deployment.
               </Alert>
             ) : (
-              <Button variant="contained" onClick={handleChooseDriveFolder} disabled={busySourceId !== null} startIcon={busySourceId === "new" ? <CircularProgress size={16} color="inherit" /> : undefined}>
-                {busySourceId === "new" ? "Opening Drive…" : "Choose Drive folder"}
+              <Button variant="contained" onClick={handleAddDriveFolder} disabled={!selectedDriveFolder || busySourceId !== null}>
+                {busySourceId === "new" ? "Adding…" : "Add"}
               </Button>
             )}
           </div>
