@@ -71,7 +71,7 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
     <AppModal
       className="quick-add-dialog"
       backdropClassName="quick-add-backdrop"
-      ariaLabel="Quick add creatures"
+      ariaLabel="Quick select creatures"
       onEntered={() => searchInputRef.current?.focus()}
       onKeyDown={handleKeyDown}
       onClose={onClose}
@@ -79,7 +79,7 @@ export function QuickAddDialog({ entries, onAdd, onClose }: Props) {
         <header className="quick-add-header">
           <div>
             <span className="eyebrow">Print selection</span>
-            <h2>Quick add</h2>
+            <h2>Quick select</h2>
           </div>
         </header>
 

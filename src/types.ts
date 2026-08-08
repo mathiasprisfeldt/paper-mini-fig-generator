@@ -2,6 +2,11 @@ export type MiniSize = 24 | 28 | 32;
 
 export type PaperFormat = "a4" | "a3";
 export type PrintLayout = "compact" | "per-creature";
+export type ThemeMode = "light" | "dark" | "auto";
+
+export interface MiniFigStyle {
+  standBufferMm: number;
+}
 
 export type CreatureSize =
   | "tiny"

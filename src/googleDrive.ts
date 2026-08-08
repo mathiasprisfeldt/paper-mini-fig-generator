@@ -3,6 +3,7 @@ import type {
   CreatureSource,
   DriveCreatureSource,
   MiniFigEntry,
+  MiniFigStyle,
   PaperFormat,
   PrintCatalogue,
 } from "./types";
@@ -119,12 +120,13 @@ interface DriveFileList {
 }
 
 interface DriveManifest {
-  version: 1 | 2 | 3 | 4 | 5;
+  version: 1 | 2 | 3 | 4 | 5 | 6;
   savedAt: number;
   catalogues: Catalogue[];
   paperFormat?: PaperFormat;
   printCatalogues?: PrintCatalogue[];
   sources?: CreatureSource[];
+  miniFigStyle?: MiniFigStyle;
 }
 
 export interface DriveLibrary {
@@ -132,6 +134,7 @@ export interface DriveLibrary {
   paperFormat?: PaperFormat;
   printCatalogues: PrintCatalogue[] | null;
   sources: CreatureSource[];
+  miniFigStyle?: MiniFigStyle;
 }
 
 function normalizeSource(value: unknown): CreatureSource | null {
@@ -714,6 +717,7 @@ export async function saveCataloguesToDrive(
   paperFormat?: PaperFormat,
   sources: CreatureSource[] = [],
   printCatalogues: PrintCatalogue[] = [],
+  miniFigStyle?: MiniFigStyle,
 ): Promise<DriveLibrary> {
   const cataloguesWithFiles = await Promise.all(
     catalogues.map(async (catalogue) => ({
@@ -727,12 +731,13 @@ export async function saveCataloguesToDrive(
   );
 
   const manifest: DriveManifest = {
-    version: 5,
+    version: 6,
     savedAt: Date.now(),
     catalogues: withoutImageData(cataloguesWithFiles),
     paperFormat,
     printCatalogues,
     sources,
+    miniFigStyle,
   };
   const manifestBlob = new Blob([JSON.stringify(manifest)], {
     type: "application/json",
@@ -749,7 +754,13 @@ export async function saveCataloguesToDrive(
   await uploadFileContent(accessToken, fileId, manifestBlob);
   await deleteOrphanedImages(accessToken, cataloguesWithFiles);
 
-  return { catalogues: cataloguesWithFiles, paperFormat, printCatalogues, sources };
+  return {
+    catalogues: cataloguesWithFiles,
+    paperFormat,
+    printCatalogues,
+    sources,
+    miniFigStyle,
+  };
 }
 
 function isCatalogue(value: unknown): value is Catalogue {
@@ -788,7 +799,7 @@ export async function loadCataloguesFromDrive(
 
   const manifestBlob = await downloadFile(accessToken, file.id);
   const manifest = JSON.parse(await manifestBlob.text()) as Partial<DriveManifest>;
-  if (![1, 2, 3, 4, 5].includes(manifest.version ?? 0) || !Array.isArray(manifest.catalogues)) {
+  if (![1, 2, 3, 4, 5, 6].includes(manifest.version ?? 0) || !Array.isArray(manifest.catalogues)) {
     throw new Error("The Google Drive catalogue file has an unsupported format.");
   }
 
@@ -809,6 +820,14 @@ export async function loadCataloguesFromDrive(
   const paperFormat = ["a4", "a3"].includes(manifest.paperFormat ?? "")
     ? manifest.paperFormat
     : undefined;
+  const miniFigStyle =
+    manifest.miniFigStyle &&
+    typeof manifest.miniFigStyle.standBufferMm === "number" &&
+    Number.isFinite(manifest.miniFigStyle.standBufferMm) &&
+    manifest.miniFigStyle.standBufferMm >= 0 &&
+    manifest.miniFigStyle.standBufferMm <= 100
+      ? manifest.miniFigStyle
+      : undefined;
   return {
     catalogues: hydratedCatalogues,
     paperFormat,
@@ -820,5 +839,6 @@ export async function loadCataloguesFromDrive(
     sources: Array.isArray(manifest.sources)
       ? manifest.sources.flatMap((source) => normalizeSource(source) ?? [])
       : [],
+    miniFigStyle,
   };
 }
