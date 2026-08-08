@@ -11,6 +11,7 @@ import {
   ButtonGroup,
   CircularProgress,
   createFilterOptions,
+  Divider,
   IconButton,
   InputBase,
   Menu,
@@ -26,9 +27,11 @@ import type {
   PrintCatalogue,
   PrintLayout,
   MiniSize,
+  CreatureSource,
+  SourceRefreshResult,
 } from "../types";
 import { AppModal } from "./AppModal";
-import { CreatureSearch } from "./CreatureSearch";
+import { CreatureToolbar } from "./CreatureToolbar";
 import { CreatureThumbnail } from "./CreatureThumbnail";
 
 interface CreateCatalogueOption {
@@ -44,8 +47,12 @@ const filterCatalogueOptions = createFilterOptions<CatalogueOption>({
 });
 const PRINT_ROW_HEIGHT = 90;
 const MOBILE_PRINT_ROW_HEIGHT = 120;
+const ALL_SOURCES = "";
+const MANUAL_SOURCE = "manual";
 interface Props {
   entries: PrintableMiniFigEntry[];
+  sources: CreatureSource[];
+  sourceFilter: string | null;
   printCatalogues: PrintCatalogue[];
   activePrintCatalogueId: string | null;
   paperFormat: PaperFormat;
@@ -54,8 +61,12 @@ interface Props {
   generating: boolean;
   exportError: string;
   onQuantityChange: (id: string, quantity: number) => void;
+  onSourceFilterChange: (sourceId: string | null) => void;
   onBlurHash: (id: string, blurHash: string) => void;
   onPreview: (id: string) => void;
+  onAddCreature: () => void;
+  onManageSources: () => void;
+  onRefreshSources: () => Promise<SourceRefreshResult>;
   onQuickAdd: () => void;
   onClearSelection: () => void;
   onPaperFormatChange: (format: PaperFormat) => void;
@@ -71,6 +82,8 @@ interface Props {
 
 export function PrintBuilder({
   entries,
+  sources,
+  sourceFilter,
   printCatalogues,
   activePrintCatalogueId,
   paperFormat,
@@ -79,8 +92,12 @@ export function PrintBuilder({
   generating,
   exportError,
   onQuantityChange,
+  onSourceFilterChange,
   onBlurHash,
   onPreview,
+  onAddCreature,
+  onManageSources,
+  onRefreshSources,
   onQuickAdd,
   onClearSelection,
   onPaperFormatChange,
@@ -104,6 +121,12 @@ export function PrintBuilder({
   const [renamingCatalogue, setRenamingCatalogue] = useState(false);
   const [catalogueNameDraft, setCatalogueNameDraft] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const activeSourceFilter =
+    !sourceFilter ||
+    sourceFilter === MANUAL_SOURCE ||
+    sources.some((source) => source.id === sourceFilter)
+      ? sourceFilter ?? ALL_SOURCES
+      : ALL_SOURCES;
   const total = entries.reduce((sum, entry) => sum + entry.quantity, 0);
   const selectedKinds = entries.filter((entry) => entry.quantity > 0).length;
   const activePrintCatalogue =
@@ -145,19 +168,36 @@ export function PrintBuilder({
           !normalized || entry.name.toLowerCase().includes(normalized);
         const matchesSelection =
           entryFilter === "all" || entry.quantity > 0;
-        return matchesQuery && matchesSelection;
+        const matchesSource =
+          activeSourceFilter === ALL_SOURCES ||
+          (activeSourceFilter === MANUAL_SOURCE
+            ? !entry.sourceId
+            : entry.sourceId === activeSourceFilter);
+        return matchesQuery && matchesSelection && matchesSource;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [entries, entryFilter, query]);
+  }, [activeSourceFilter, entries, entryFilter, query]);
   return (
     <div className="print-layout">
       <section className="print-picker">
         <div className="section-toolbar">
-          <div className="print-toolbar-actions">
-            <CreatureSearch
+          <CreatureToolbar
+              entries={entries}
+              sources={sources}
+              sourceFilter={sourceFilter}
               query={query}
               onQueryChange={setQuery}
               searchAriaLabel="Search print creatures"
+              filterAriaLabel="Filter print creatures by source"
+              onSourceFilterChange={onSourceFilterChange}
+              onManageSources={onManageSources}
+              onRefreshSources={onRefreshSources}
+              onAddCreature={onAddCreature}
+          >
+              <Divider
+                className="print-toolbar-divider"
+              flexItem
+              orientation="vertical"
             />
             <ToggleButton
               className="print-selected-toggle"
@@ -171,18 +211,21 @@ export function PrintBuilder({
               color="primary"
               size="small"
               aria-label="Show selected creatures only"
+              sx={{ height: 40 }}
             >
               Selected creatures ({selectedKinds})
             </ToggleButton>
             <Button
               variant="outlined"
+              size="small"
               type="button"
               onClick={onQuickAdd}
               disabled={entries.length === 0}
+              sx={{ height: 40 }}
             >
-              Quick add
+              Quick select
             </Button>
-          </div>
+          </CreatureToolbar>
         </div>
 
         {visibleEntries.length > 0 ? (
@@ -202,63 +245,63 @@ export function PrintBuilder({
                       rowRenderer={({ index, key, style }) => {
                         const entry = visibleEntries[index];
                         return (
-                  <article
-                    className={`print-creature-row${entry.quantity ? " selected" : ""}`}
-                    key={key}
-                    style={style}
-                  >
-                  <CreatureThumbnail
-                    className="print-creature-thumbnail"
-                    entry={entry}
-                    imageLoading="eager"
-                    onPreview={onPreview}
-                    onBlurHash={onBlurHash}
-                  />
-                  <div className="print-creature-info">
-                    <strong>{entry.name || "Unnamed creature"}</strong>
-                    <span>{entry.creatureSize}</span>
-                  </div>
-                  <ButtonGroup
-                    className="quantity-stepper"
-                    variant="outlined"
-                    size="small"
-                    aria-label={`${entry.name || "Creature"} quantity`}
-                  >
-                    <Button
-                      size="small"
-                      type="button"
-                      aria-label={`Decrease ${entry.name || "unnamed creature"} quantity`}
-                      onClick={() => onQuantityChange(entry.id, entry.quantity - 1)}
-                      disabled={entry.quantity === 0}
-                    >
-                      −
-                    </Button>
-                    <InputBase
-                      className="quantity-input"
-                      type="number"
-                      inputProps={{
-                        "aria-label": `${entry.name || "Unnamed creature"} quantity`,
-                        min: 0,
-                        max: 99,
-                      }}
-                      value={entry.quantity}
-                      onChange={(event) => {
-                        if (event.target.value !== "") {
-                          onQuantityChange(entry.id, Number(event.target.value));
-                        }
-                      }}
-                    />
-                    <Button
-                      size="small"
-                      type="button"
-                      aria-label={`Increase ${entry.name || "unnamed creature"} quantity`}
-                      onClick={() => onQuantityChange(entry.id, entry.quantity + 1)}
-                      disabled={entry.quantity >= 99}
-                    >
-                      +
-                    </Button>
-                  </ButtonGroup>
-                  </article>
+                          <div key={key} style={style}>
+                            <article
+                              className={`print-creature-row${entry.quantity ? " selected" : ""}`}
+                            >
+                              <CreatureThumbnail
+                                className="print-creature-thumbnail"
+                                entry={entry}
+                                imageLoading="eager"
+                                onPreview={onPreview}
+                                onBlurHash={onBlurHash}
+                              />
+                              <div className="print-creature-info">
+                                <strong>{entry.name || "Unnamed creature"}</strong>
+                                <span>{entry.creatureSize}</span>
+                              </div>
+                              <ButtonGroup
+                                className="quantity-stepper"
+                                variant="outlined"
+                                size="small"
+                                aria-label={`${entry.name || "Creature"} quantity`}
+                              >
+                                <Button
+                                  size="small"
+                                  type="button"
+                                  aria-label={`Decrease ${entry.name || "unnamed creature"} quantity`}
+                                  onClick={() => onQuantityChange(entry.id, entry.quantity - 1)}
+                                  disabled={entry.quantity === 0}
+                                >
+                                  −
+                                </Button>
+                                <InputBase
+                                  className="quantity-input"
+                                  type="number"
+                                  inputProps={{
+                                    "aria-label": `${entry.name || "Unnamed creature"} quantity`,
+                                    min: 0,
+                                    max: 99,
+                                  }}
+                                  value={entry.quantity}
+                                  onChange={(event) => {
+                                    if (event.target.value !== "") {
+                                      onQuantityChange(entry.id, Number(event.target.value));
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  size="small"
+                                  type="button"
+                                  aria-label={`Increase ${entry.name || "unnamed creature"} quantity`}
+                                  onClick={() => onQuantityChange(entry.id, entry.quantity + 1)}
+                                  disabled={entry.quantity >= 99}
+                                >
+                                  +
+                                </Button>
+                              </ButtonGroup>
+                            </article>
+                          </div>
                         );
                       }}
                       scrollTop={scrollTop}
@@ -288,6 +331,7 @@ export function PrintBuilder({
         )}
       </section>
 
+      <div className="print-sidebar-spacer" aria-hidden="true" />
       <aside className="print-sidebar">
         <section className="print-catalogue-panel" aria-label="Print catalogues">
           <div className="print-catalogue-heading">

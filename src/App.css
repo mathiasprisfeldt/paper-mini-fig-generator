@@ -51,13 +51,6 @@
   stroke-width: 1.75;
 }
 
-.app-header h1 {
-  font-size: 1.75rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin-bottom: 0.25rem;
-}
-
 .subtitle {
   color: var(--text-muted);
   font-size: 0.95rem;
@@ -871,14 +864,48 @@
   gap: 1rem;
 }
 
-.settings-heading p {
-  margin-top: 0.25rem;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
-
 .settings-view .drive-sync {
   margin-bottom: 0;
+}
+
+.theme-mode-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.theme-mode-setting h3,
+.theme-mode-setting p {
+  margin: 0;
+}
+
+.theme-mode-setting h3 {
+  font-size: 0.95rem;
+}
+
+.theme-mode-setting p {
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.theme-mode-setting .MuiToggleButtonGroup-root {
+  flex-shrink: 0;
+}
+
+.theme-mode-setting .MuiToggleButton-root {
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+.theme-mode-setting .MuiToggleButton-root.Mui-selected {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .add-creature-panel {
@@ -1033,7 +1060,7 @@
   margin-right: auto;
 }
 
-.binder-toolbar-actions {
+.creature-toolbar-actions {
   display: flex;
   align-items: center;
   width: 100%;
@@ -1471,6 +1498,77 @@
   padding-left: var(--modal-padding);
 }
 
+.mini-fig-style-view {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.7fr) minmax(0, 1fr);
+  gap: 1.5rem;
+}
+
+.mini-fig-style-settings,
+.mini-fig-style-preview {
+  display: grid;
+  align-content: start;
+  gap: 1.25rem;
+}
+
+.mini-fig-style-preview-refresh {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  z-index: 1;
+}
+
+.mini-fig-style-heading {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.mini-fig-style-heading h2 {
+  margin: 0;
+}
+
+.mini-fig-style-heading p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.mini-fig-style-panel {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.mini-fig-style-panel h3,
+.mini-fig-style-panel p {
+  margin: 0;
+}
+
+.mini-fig-style-panel h3 {
+  font-size: 0.95rem;
+}
+
+.mini-fig-style-panel p {
+  margin-top: 0.3rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.mini-fig-style-panel .MuiTextField-root {
+  width: min(100%, 250px);
+}
+
+.mini-fig-style-reset {
+  justify-self: start;
+}
+
 .creature-preview-name,
 .creature-preview-select {
   display: grid;
@@ -1709,8 +1807,10 @@
 .print-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-rows: 4rem auto;
   align-items: start;
-  gap: 1.25rem;
+  column-gap: 1.25rem;
+  row-gap: 0;
 }
 
 .print-catalogue-panel {
@@ -1725,10 +1825,18 @@
 }
 
 .print-sidebar {
+  grid-column: 2;
+  grid-row: 2;
   position: sticky;
   top: 1rem;
   display: grid;
   gap: 1rem;
+}
+
+.print-sidebar-spacer {
+  grid-column: 2;
+  grid-row: 1;
+  height: 4rem;
 }
 
 .print-catalogue-heading {
@@ -1863,12 +1971,21 @@
   gap: 1rem;
 }
 
-.print-picker,
 .print-summary {
   padding: 1.1rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+}
+
+.print-picker {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  min-width: 0;
+}
+
+.print-creature-list {
+  padding-top: 0.5rem;
 }
 
 .creature-search-filter-button svg {
@@ -1884,15 +2001,8 @@
   flex-shrink: 0;
 }
 
-.print-toolbar-actions {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  gap: 0.5rem;
-}
-
-.print-toolbar-actions .btn {
-  flex-shrink: 0;
+.print-toolbar-divider {
+  margin-inline: 0.2rem;
 }
 
 .print-creature-row {
@@ -1902,7 +2012,9 @@
   gap: 0.85rem;
   padding: 0.55rem;
   border: 1px solid var(--border);
-  background: var(--bg);
+  border-radius: var(--radius);
+  background: var(--surface);
+  height: calc(100% - 0.5rem);
 }
 
 .print-creature-row.selected {
@@ -2397,6 +2509,10 @@
 }
 
 @media (max-width: 900px) {
+  .mini-fig-style-view {
+    grid-template-columns: 1fr;
+  }
+
   .creature-preview-workspace {
     grid-template-columns: 1fr;
   }
@@ -2443,6 +2559,19 @@
 
   .print-layout {
     grid-template-columns: 1fr;
+    grid-template-rows: none;
+    gap: 1.25rem;
+  }
+
+  .print-picker,
+  .print-sidebar-spacer,
+  .print-sidebar {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .print-sidebar-spacer {
+    display: none;
   }
 
   .print-summary {
@@ -2455,6 +2584,19 @@
 }
 
 @media (max-width: 640px) {
+  .theme-mode-setting {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .theme-mode-setting .MuiToggleButtonGroup-root {
+    display: flex;
+  }
+
+  .theme-mode-setting .MuiToggleButton-root {
+    flex: 1;
+  }
+
   .debug-menu-button {
     bottom: 0.85rem;
     left: 0.85rem;
@@ -2495,16 +2637,14 @@
     width: 100%;
   }
 
-  .binder-toolbar-actions {
+  .creature-toolbar-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
     width: 100%;
   }
 
-  .print-toolbar-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    width: 100%;
+  .print-toolbar-divider {
+    display: none;
   }
 
   .creature-search {

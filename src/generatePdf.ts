@@ -53,7 +53,6 @@ const LABEL_GAP_MM = 2; // gap between the figure edge and the label block
 const SCALE = 12; // canvas pixels per millimetre (mm → px conversion for rendering)
 const LABEL_PX = LABEL_HEIGHT_MM * SCALE;
 const NUMBER_PX = NUMBER_HEIGHT_MM * SCALE;
-const BUFFER_PX = STAND_BUFFER_MM * SCALE;
 const GAP_PX = LABEL_GAP_MM * SCALE;
 
 // ---------------------------------------------------------------------------
@@ -143,13 +142,14 @@ function miniHeightMm(
   widthMm: number,
   showName: boolean,
   hasNumber: boolean,
+  standBufferMm: number,
 ): number {
   const imgH = imageHeightMm(img, widthMm);
   let labels = 0;
   if (showName || hasNumber) labels += LABEL_GAP_MM;
   if (showName) labels += LABEL_HEIGHT_MM;
   if (hasNumber) labels += NUMBER_HEIGHT_MM;
-  return STAND_BUFFER_MM + labels + imgH * 2 + labels + STAND_BUFFER_MM;
+  return standBufferMm + labels + imgH * 2 + labels + standBufferMm;
 }
 
 export function getEntryImageSource(entry: MiniFigEntry): string | null {
@@ -192,13 +192,21 @@ function renderEdgeStrip(
   const fctx = full.getContext("2d")!;
   fctx.drawImage(img, 0, 0, w, imgScaledH);
 
-  // Crop the edge strip we care about
-  const sy = edge === "bottom" ? Math.max(0, imgScaledH - h) : 0;
   const crop = document.createElement("canvas");
   crop.width = w;
   crop.height = h;
   const cctx = crop.getContext("2d")!;
-  cctx.drawImage(full, 0, sy, w, h, 0, 0, w, h);
+  if (h <= imgScaledH) {
+    const sy = edge === "bottom" ? imgScaledH - h : 0;
+    cctx.drawImage(full, 0, sy, w, h, 0, 0, w, h);
+  } else {
+    // A large stand buffer needs more artwork than the scaled image contains.
+    // Draw it with cover behavior: preserve the artwork ratio and crop the
+    // horizontal overflow instead of stretching pixels vertically.
+    const scale = h / imgScaledH;
+    const coveredWidth = w * scale;
+    cctx.drawImage(full, (w - coveredWidth) / 2, 0, coveredWidth, h);
+  }
 
   return crop;
 }
@@ -362,6 +370,7 @@ function drawMiniFigToCanvas(
   showName: boolean,
   number: number | null,
   widthMm: number,
+  standBufferMm: number,
 ): HTMLCanvasElement {
   const widthPx = Math.round(widthMm * SCALE);
   const hasNumber = number != null;
@@ -372,7 +381,8 @@ function drawMiniFigToCanvas(
   if (hasName || hasNumber) labels += GAP_PX;
   if (hasName) labels += LABEL_PX;
   if (hasNumber) labels += NUMBER_PX;
-  const bandH = BUFFER_PX + labels;
+  const bufferPx = standBufferMm * SCALE;
+  const bandH = bufferPx + labels;
 
   const totalW = widthPx;
   const fadeZone = getFadeZonePx(widthPx, img);
@@ -408,7 +418,7 @@ function drawMiniFigToCanvas(
   ctx.drawImage(botBand, 0, imgTopY + imgPx * 2 - fadeZone);
 
   // === Text on TOP BAND (rotated 180° so it reads correctly when folded) ===
-  let ty = BUFFER_PX;
+  let ty = bufferPx;
   if (hasNumber) {
     ctx.save();
     ctx.translate(totalW, ty + NUMBER_PX);
@@ -464,6 +474,7 @@ function renderPdfBand(
   fadeZone: number,
   side: "top" | "bottom",
   labels: { text: string; hPx: number; fontSize: number }[],
+  bufferPx: number,
 ): string {
   const w = Math.round(widthMm * SCALE);
   const band = renderFadedBlurBand(img, w, contentH, fadeZone, side);
@@ -479,7 +490,7 @@ function renderPdfBand(
   // The bottom band's content sits below the fade zone overlapping the image.
   const flipped = side === "top";
   const hasLabels = labels.length > 0;
-  let y = flipped ? BUFFER_PX : fadeZone + (hasLabels ? GAP_PX : 0);
+  let y = flipped ? bufferPx : fadeZone + (hasLabels ? GAP_PX : 0);
   for (const label of labels) {
     if (flipped) {
       ctx.save();
@@ -503,10 +514,11 @@ interface MiniPdfData {
   number: number | null;
   heightMm: number;
   widthMm: number;
+  standBufferMm: number;
 }
 
 function drawMiniToPdf(pdf: jsPDF, mini: MiniPdfData, ox: number, oy: number) {
-  const { img, name, showName, number, widthMm } = mini;
+  const { img, name, showName, number, widthMm, standBufferMm } = mini;
   const widthPx = Math.round(widthMm * SCALE);
   const hasNumber = number != null;
   const hasName = showName && !!name;
@@ -550,9 +562,10 @@ function drawMiniToPdf(pdf: jsPDF, mini: MiniPdfData, ox: number, oy: number) {
   if (hasAnyLabel) labelsPx += GAP_PX;
   if (hasName) labelsPx += LABEL_PX;
   if (hasNumber) labelsPx += NUMBER_PX;
-  const bandH = BUFFER_PX + labelsPx;
+  const bufferPx = standBufferMm * SCALE;
+  const bandH = bufferPx + labelsPx;
   const bandMm =
-    STAND_BUFFER_MM +
+    standBufferMm +
     (hasAnyLabel ? LABEL_GAP_MM : 0) +
     (hasName ? LABEL_HEIGHT_MM : 0) +
     (hasNumber ? NUMBER_HEIGHT_MM : 0);
@@ -575,7 +588,15 @@ function drawMiniToPdf(pdf: jsPDF, mini: MiniPdfData, ox: number, oy: number) {
   pdf.addImage(img, "PNG", ox, frontY, widthMm, imgHMm);
 
   // Top band (blurred, mirrored), fading down into the mirrored image
-  const topUrl = renderPdfBand(img, widthMm, bandH, fadeZone, "top", topLabels);
+  const topUrl = renderPdfBand(
+    img,
+    widthMm,
+    bandH,
+    fadeZone,
+    "top",
+    topLabels,
+    bufferPx,
+  );
   pdf.addImage(topUrl, "PNG", ox, oy, widthMm, bandMm + fadeMm);
 
   // Bottom band (blurred, mirrored), fading up into the front image
@@ -586,6 +607,7 @@ function drawMiniToPdf(pdf: jsPDF, mini: MiniPdfData, ox: number, oy: number) {
     fadeZone,
     "bottom",
     botLabels,
+    bufferPx,
   );
   pdf.addImage(botUrl, "PNG", ox, botBandY - fadeMm, widthMm, bandMm + fadeMm);
 }
@@ -595,6 +617,7 @@ async function buildPdf(
   format: PaperFormat = "a4",
   layout: PrintLayout = "compact",
   miniSize: MiniSize = 28,
+  standBufferMm = STAND_BUFFER_MM,
 ): Promise<jsPDF | null> {
   await fontReady;
   const validEntries = entries.filter(
@@ -619,6 +642,7 @@ async function buildPdf(
         widthMm,
         entry.showName && !!entry.name,
         number != null,
+        standBufferMm,
       );
       minis.push({
         img,
@@ -627,6 +651,7 @@ async function buildPdf(
         number,
         heightMm,
         widthMm,
+        standBufferMm,
       });
     }
     miniGroups.push(minis);
@@ -682,8 +707,9 @@ export async function generatePdf(
   catalogueName = "paper-minis",
   layout: PrintLayout = "compact",
   miniSize: MiniSize = 28,
+  standBufferMm = STAND_BUFFER_MM,
 ): Promise<void> {
-  const pdf = await buildPdf(entries, format, layout, miniSize);
+  const pdf = await buildPdf(entries, format, layout, miniSize, standBufferMm);
   if (!pdf) return;
 
   const safeName =
@@ -696,8 +722,9 @@ export async function renderPrintSheetPreview(
   format: PaperFormat,
   layout: PrintLayout,
   miniSize: MiniSize,
+  standBufferMm = STAND_BUFFER_MM,
 ): Promise<Blob | null> {
-  const pdf = await buildPdf(entries, format, layout, miniSize);
+  const pdf = await buildPdf(entries, format, layout, miniSize, standBufferMm);
   return pdf ? pdf.output("blob") : null;
 }
 
@@ -705,6 +732,7 @@ export async function renderPreview(
   entry: MiniFigEntry,
   number: number | null,
   miniSize: MiniSize,
+  standBufferMm = STAND_BUFFER_MM,
 ): Promise<string> {
   await fontReady;
   const source = getEntryImageSource(entry);
@@ -717,6 +745,7 @@ export async function renderPreview(
     entry.showName,
     number,
     widthMm,
+    standBufferMm,
   );
   return canvas.toDataURL("image/png");
 }
