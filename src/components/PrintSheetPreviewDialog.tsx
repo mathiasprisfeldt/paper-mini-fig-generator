@@ -15,6 +15,7 @@ interface Props {
   format: PaperFormat;
   layout: PrintLayout;
   miniSize: MiniSize;
+  standBufferMm: number;
   resolveEntries: (entries: MiniFigEntry[]) => Promise<MiniFigEntry[]>;
   autoPrint?: boolean;
   onClose: () => void;
@@ -31,6 +32,7 @@ export function PrintSheetPreviewDialog({
   format,
   layout,
   miniSize,
+  standBufferMm,
   resolveEntries,
   autoPrint = false,
   onClose,
@@ -39,7 +41,13 @@ export function PrintSheetPreviewDialog({
     () => entries.filter((entry) => entry.quantity > 0),
     [entries],
   );
-  const previewKey = JSON.stringify({ selectedEntries, format, layout, miniSize });
+  const previewKey = JSON.stringify({
+    selectedEntries,
+    format,
+    layout,
+    miniSize,
+    standBufferMm,
+  });
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const isCurrentPreview = preview?.key === previewKey;
   const previewUrl = isCurrentPreview ? preview.url : "";
@@ -62,6 +70,7 @@ export function PrintSheetPreviewDialog({
           format,
           layout,
           miniSize,
+          standBufferMm,
         );
       })
       .then((blob) => {
@@ -96,7 +105,15 @@ export function PrintSheetPreviewDialog({
       active = false;
       if (previewUrlToRevoke) URL.revokeObjectURL(previewUrlToRevoke);
     };
-  }, [format, layout, miniSize, previewKey, resolveEntries, selectedEntries]);
+  }, [
+    format,
+    layout,
+    miniSize,
+    previewKey,
+    resolveEntries,
+    selectedEntries,
+    standBufferMm,
+  ]);
 
   const total = selectedEntries.reduce((sum, entry) => sum + entry.quantity, 0);
 

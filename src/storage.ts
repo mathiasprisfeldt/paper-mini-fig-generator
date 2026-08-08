@@ -3,16 +3,20 @@ import type {
   CreatureSource,
   CreatureSize,
   MiniFigEntry,
+  MiniFigStyle,
   MiniSize,
   PaperFormat,
   PrintCatalogue,
   PrintLayout,
+  ThemeMode,
 } from "./types";
 
 const CATALOGUES_KEY = "paper-mini-fig-catalogues";
 const ACTIVE_CATALOGUE_KEY = "paper-mini-fig-active-catalogue";
 const PAPER_FORMAT_KEY = "paper-mini-fig-paper-format";
 const MINI_SIZE_KEY = "paper-mini-fig-mini-size";
+const MINI_FIG_STYLE_KEY = "paper-mini-fig-style";
+const THEME_MODE_KEY = "paper-mini-fig-theme-mode";
 const PRINT_CATALOGUES_KEY = "paper-mini-fig-print-catalogues";
 const ACTIVE_PRINT_CATALOGUE_KEY = "paper-mini-fig-active-print-catalogue";
 const SOURCES_KEY = "paper-mini-fig-sources";
@@ -27,6 +31,7 @@ const VALID_PRINT_LAYOUTS: PrintLayout[] = ["compact", "per-creature"];
 const VALID_CREATURE_SIZES: CreatureSize[] = [
   "tiny", "small", "medium", "large", "huge", "gargantuan",
 ];
+const DEFAULT_STAND_BUFFER_MM = 10;
 
 export function migrateMiniFigEntry(e: unknown): MiniFigEntry {
   const raw =
@@ -215,6 +220,39 @@ export function getMiniSize(): MiniSize {
 
 export function setMiniSize(size: MiniSize): void {
   localStorage.setItem(MINI_SIZE_KEY, String(size));
+}
+
+export function getMiniFigStyle(): MiniFigStyle {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(MINI_FIG_STYLE_KEY) || "{}");
+    const standBufferMm = raw && typeof raw === "object"
+      ? (raw as Record<string, unknown>).standBufferMm
+      : undefined;
+    return {
+      standBufferMm:
+        typeof standBufferMm === "number" &&
+        Number.isFinite(standBufferMm) &&
+        standBufferMm >= 0 &&
+        standBufferMm <= 100
+          ? standBufferMm
+          : DEFAULT_STAND_BUFFER_MM,
+    };
+  } catch {
+    return { standBufferMm: DEFAULT_STAND_BUFFER_MM };
+  }
+}
+
+export function setMiniFigStyle(style: MiniFigStyle): void {
+  localStorage.setItem(MINI_FIG_STYLE_KEY, JSON.stringify(style));
+}
+
+export function getThemeMode(): ThemeMode {
+  const mode = localStorage.getItem(THEME_MODE_KEY);
+  return mode === "light" || mode === "dark" || mode === "auto" ? mode : "auto";
+}
+
+export function setThemeMode(mode: ThemeMode): void {
+  localStorage.setItem(THEME_MODE_KEY, mode);
 }
 
 export function loadSources(): CreatureSource[] {

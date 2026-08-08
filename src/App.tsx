@@ -8,22 +8,27 @@ import {
   Switch,
   Tab,
   Tabs,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import type {
   Catalogue,
   CreatureSource,
   MiniFigEntry,
+  MiniFigStyle,
   MiniSize,
   PaperFormat,
   PrintableMiniFigEntry,
   PrintCatalogue,
   PrintLayout,
   SourceRefreshResult,
+  ThemeMode,
 } from "./types";
 import { AddCreatureForm } from "./components/AddCreatureForm";
 import { AppModal } from "./components/AppModal";
 import { CreatureBinder } from "./components/CreatureBinder";
 import { CreaturePreviewDialog } from "./components/CreaturePreviewDialog";
+import { MiniFigStyle as MiniFigStylePanel } from "./components/MiniFigStyle";
 import { PrintBuilder } from "./components/PrintBuilder";
 import { PrintSheetPreviewDialog } from "./components/PrintSheetPreviewDialog";
 import { QuickAddDialog } from "./components/QuickAddDialog";
@@ -51,6 +56,7 @@ import {
   getDriveSessionCredential,
   getPaperFormat,
   getMiniSize,
+  getMiniFigStyle,
   loadSources,
   loadCatalogues,
   loadPrintCatalogues,
@@ -61,15 +67,17 @@ import {
   setDriveSessionCredential,
   setPaperFormat as savePaperFormat,
   setMiniSize as saveMiniSize,
+  setMiniFigStyle as saveMiniFigStyle,
 } from "./storage";
 import "./App.css";
 
-type AppView = "binder" | "print" | "settings";
+type AppView = "binder" | "print" | "style" | "settings";
 type AppModalId = "add-creature" | "sources" | "quick-add";
 interface DriveSyncPayload {
   accessToken: string;
   catalogues: Catalogue[];
   paperFormat: PaperFormat;
+  miniFigStyle: MiniFigStyle;
   printCatalogues: PrintCatalogue[];
   session: number;
   signature: string;
@@ -82,7 +90,7 @@ const SOURCE_QUERY_PARAM = "source";
 const CATALOGUE_QUERY_PARAM = "catalogue";
 const VIEW_QUERY_PARAM = "view";
 const APP_MODALS: AppModalId[] = ["add-creature", "sources", "quick-add"];
-const APP_VIEWS: AppView[] = ["binder", "print", "settings"];
+const APP_VIEWS: AppView[] = ["binder", "print", "style", "settings"];
 const DRIVE_AUTOSYNC_DELAY_MS = 1000;
 
 function getModalFromUrl(): AppModalId | null {
@@ -150,6 +158,7 @@ function createDriveSyncSignature(
   paperFormat: PaperFormat,
   printCatalogues: PrintCatalogue[],
   sources: CreatureSource[],
+  miniFigStyle: MiniFigStyle,
 ): string {
   return JSON.stringify({
     catalogues: catalogues.map((catalogue) => ({
@@ -170,6 +179,7 @@ function createDriveSyncSignature(
     paperFormat,
     printCatalogues,
     sources,
+    miniFigStyle,
   });
 }
 
@@ -177,7 +187,12 @@ function hasEntryImage(entry: MiniFigEntry): boolean {
   return Boolean(getEntryImageSource(entry) || entry.imageDriveFileId);
 }
 
-function App() {
+interface AppProps {
+  themeMode: ThemeMode;
+  onThemeModeChange: (mode: ThemeMode) => void;
+}
+
+function App({ themeMode, onThemeModeChange }: AppProps) {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? "";
   const googleAppId = import.meta.env.VITE_GOOGLE_APP_ID?.trim() ?? "";
   const googleDeveloperKey = import.meta.env.VITE_GOOGLE_API_KEY?.trim() ?? "";
@@ -207,6 +222,7 @@ function App() {
   const [sources, setSources] = useState<CreatureSource[]>(loadSources);
   const [paperFormat, setPaperFormatState] = useState<PaperFormat>(getPaperFormat);
   const [miniSize, setMiniSizeState] = useState<MiniSize>(getMiniSize);
+  const [miniFigStyle, setMiniFigStyle] = useState<MiniFigStyle>(getMiniFigStyle);
   const [printLayout, setPrintLayout] = useState<PrintLayout>("compact");
   const [printQuantities, setPrintQuantities] = useState<Record<string, number>>({});
   const [printCatalogues, setPrintCatalogues] = useState<PrintCatalogue[]>(
@@ -785,12 +801,14 @@ function App() {
         paperFormat,
         sources,
         printCatalogues,
+        miniFigStyle,
       );
       lastDriveSyncSignature.current = createDriveSyncSignature(
         saved.catalogues,
         paperFormat,
         printCatalogues,
         sources,
+        miniFigStyle,
       );
       setCatalogues(normalizeAsBinder(saved.catalogues));
       setDriveStatus("synced");
@@ -800,7 +818,7 @@ function App() {
       handleDriveError(error);
       throw error;
     }
-  }, [addEntry, catalogues, closeNavigationModal, driveAccessToken, driveAutosync, handleDriveError, paperFormat, printCatalogues, sources]);
+  }, [addEntry, catalogues, closeNavigationModal, driveAccessToken, driveAutosync, handleDriveError, miniFigStyle, paperFormat, printCatalogues, sources]);
 
   const connectAndSyncDrive = useCallback(async (
     prompt: "" | "none",
@@ -830,11 +848,13 @@ function App() {
           const remotePaperFormat = remote.paperFormat ?? paperFormat;
           const remotePrintCatalogues =
             remote.printCatalogues ?? printCatalogues;
+          const remoteMiniFigStyle = remote.miniFigStyle ?? miniFigStyle;
           lastDriveSyncSignature.current = createDriveSyncSignature(
             remoteCatalogues,
             remotePaperFormat,
             remote.printCatalogues ?? [],
             remote.sources,
+            remoteMiniFigStyle,
           );
           setCatalogues(remoteCatalogues);
           setPrintCatalogues(remotePrintCatalogues);
@@ -856,6 +876,10 @@ function App() {
             setPaperFormatState(remote.paperFormat);
             savePaperFormat(remote.paperFormat);
           }
+          if (remote.miniFigStyle) {
+            setMiniFigStyle(remote.miniFigStyle);
+            saveMiniFigStyle(remote.miniFigStyle);
+          }
           setDriveMessage("Binder loaded from Drive. Autosync is on.");
         } else {
           setDriveMessage("Creating your Drive binder…");
@@ -865,6 +889,7 @@ function App() {
             paperFormat,
             sources,
             printCatalogues,
+            miniFigStyle,
           );
           if (session !== driveSession.current) return;
           const savedCatalogues = normalizeAsBinder(saved.catalogues);
@@ -873,6 +898,7 @@ function App() {
             paperFormat,
             printCatalogues,
             sources,
+            miniFigStyle,
           );
           setCatalogues(savedCatalogues);
           setDriveMessage("Drive binder created. Autosync is on.");
@@ -930,6 +956,7 @@ function App() {
     catalogues,
     googleClientId,
     handleDriveError,
+    miniFigStyle,
     paperFormat,
     printCatalogues,
     sources,
@@ -1025,6 +1052,7 @@ function App() {
             payload.paperFormat,
             payload.sources,
             payload.printCatalogues,
+            payload.miniFigStyle,
           );
           if (
             payload.session !== driveSession.current ||
@@ -1037,6 +1065,7 @@ function App() {
             payload.paperFormat,
             payload.printCatalogues,
             payload.sources,
+            payload.miniFigStyle,
           );
           applyDriveFileIds(saved.catalogues);
           setDriveStatus("synced");
@@ -1065,6 +1094,7 @@ function App() {
       paperFormat,
       printCatalogues,
       sources,
+      miniFigStyle,
     );
     if (signature === lastDriveSyncSignature.current) return;
 
@@ -1074,6 +1104,7 @@ function App() {
         catalogues,
         paperFormat,
         printCatalogues,
+        miniFigStyle,
         session: driveSession.current,
         signature,
         sources,
@@ -1088,6 +1119,7 @@ function App() {
     driveAutosync,
     paperFormat,
     printCatalogues,
+    miniFigStyle,
     runQueuedDriveSync,
     sources,
   ]);
@@ -1115,6 +1147,7 @@ function App() {
         activePrintCatalogue?.name || "paper-minis",
         activePrintLayout,
         activeMiniSize,
+        miniFigStyle.standBufferMm,
       );
     } catch (error) {
       const message = error instanceof Error
@@ -1157,8 +1190,7 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div>
-          <span className="eyebrow">Tabletop toolkit</span>
-          <h1>Paper Mini Foundry</h1>
+          <span className="eyebrow">Paper Mini Foundry</span>
           <p className="subtitle">Build a reusable creature binder, then compose a print sheet.</p>
         </div>
         <div className="header-navigation">
@@ -1170,6 +1202,25 @@ function App() {
           >
             <Tab value="binder" label="Binder" />
             <Tab value="print" label="Print" />
+            <Tab
+              value="style"
+              className="settings-tab"
+              icon={
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M4 17.5V20h2.5L17.4 9.1l-2.5-2.5L4 17.5Z" />
+                  <path d="m13.9 7.6 2.5 2.5M16.5 5l2.5 2.5M3 21h18" />
+                </svg>
+              }
+              aria-label="Style"
+            />
             <Tab
               value="settings"
               className="settings-tab"
@@ -1259,6 +1310,8 @@ function App() {
           )}
           <PrintBuilder
             entries={printableEntries}
+            sources={sources}
+            sourceFilter={sourceFilter}
             printCatalogues={printCatalogues}
             activePrintCatalogueId={activePrintCatalogueId}
             paperFormat={activePaperFormat}
@@ -1267,8 +1320,12 @@ function App() {
             generating={generating}
             exportError={exportError}
             onQuantityChange={setQuantity}
+            onSourceFilterChange={changeSourceFilter}
             onBlurHash={(id, blurHash) => updateEntry(id, { blurHash })}
             onPreview={openCreaturePreview}
+            onAddCreature={() => openNavigationModal("add-creature")}
+            onManageSources={() => openNavigationModal("sources")}
+            onRefreshSources={refreshAllSources}
             onQuickAdd={() => openNavigationModal("quick-add")}
             onClearSelection={clearPrintSelection}
             onPaperFormatChange={handleSetPaperFormat}
@@ -1282,13 +1339,44 @@ function App() {
             onDeletePrintCatalogue={deletePrintCatalogue}
           />
         </main>
+      ) : view === "style" ? (
+        <MiniFigStylePanel
+          entries={printableEntries}
+          miniSize={activeMiniSize}
+          standBufferMm={miniFigStyle.standBufferMm}
+          resolveEntry={resolvePreviewEntry}
+          forcePlaceholder={forcePlaceholders}
+          onStandBufferChange={(standBufferMm) => {
+            const nextStyle = { standBufferMm };
+            setMiniFigStyle(nextStyle);
+            saveMiniFigStyle(nextStyle);
+          }}
+        />
       ) : (
         <main className="settings-view">
           <div className="settings-heading">
-            <span className="eyebrow">Application settings</span>
             <h2>Settings</h2>
-            <p>Manage cloud storage, backups, and your Google Drive connection.</p>
           </div>
+          <section className="theme-mode-setting" aria-labelledby="theme-mode-title">
+            <div>
+              <h3 id="theme-mode-title">Theme</h3>
+              <p>Choose how Paper Mini Foundry appears on this device.</p>
+            </div>
+            <ToggleButtonGroup
+              exclusive
+              value={themeMode}
+              onChange={(_, nextMode: ThemeMode | null) => {
+                if (!nextMode) return;
+                onThemeModeChange(nextMode);
+              }}
+              aria-label="Theme mode"
+              size="small"
+            >
+              <ToggleButton value="light">Light</ToggleButton>
+              <ToggleButton value="dark">Dark</ToggleButton>
+              <ToggleButton value="auto">Auto</ToggleButton>
+            </ToggleButtonGroup>
+          </section>
           {driveSyncPanel}
         </main>
       )}
@@ -1350,6 +1438,7 @@ function App() {
           key={previewEntry.id}
           entry={previewEntry}
           miniSize={activeMiniSize}
+          standBufferMm={miniFigStyle.standBufferMm}
           resolveEntry={resolvePreviewEntry}
           forcePlaceholder={forcePlaceholders}
           onUpdate={updateEntry}
@@ -1362,6 +1451,7 @@ function App() {
           format={activePaperFormat}
           layout={activePrintLayout}
           miniSize={activeMiniSize}
+          standBufferMm={miniFigStyle.standBufferMm}
           resolveEntries={resolveDriveSourceEntries}
           autoPrint
           onClose={() => setIsPrintSheetPreviewOpen(false)}

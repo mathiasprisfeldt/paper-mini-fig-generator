@@ -16,11 +16,9 @@ import type {
   MiniFigEntry,
   SourceRefreshResult,
 } from "../types";
-import { useToast } from "../toastContext";
-import { CreatureSearch } from "./CreatureSearch";
+import { CreatureToolbar } from "./CreatureToolbar";
 import { CreatureThumbnail } from "./CreatureThumbnail";
 import {
-  Button,
   IconButton,
   Menu,
   MenuItem,
@@ -324,18 +322,7 @@ export function CreatureBinder({
   onRefreshSources,
   onSourceFilterChange,
 }: Props) {
-  const { showToast } = useToast();
   const [query, setQuery] = useState("");
-  const [refreshing, setRefreshing] = useState(false);
-  const sourceCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const entry of entries) {
-      const key = entry.sourceId ?? MANUAL_SOURCE;
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    return counts;
-  }, [entries]);
-
   const activeSourceFilter =
     !sourceFilter ||
     sourceFilter === MANUAL_SOURCE ||
@@ -359,94 +346,23 @@ export function CreatureBinder({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [activeSourceFilter, entries, query]);
 
-  const refreshAllSources = async () => {
-    setRefreshing(true);
-    try {
-      const result = await onRefreshSources();
-      showToast({
-        tone: "success",
-        title: `Refreshed ${sources.length} source${sources.length === 1 ? "" : "s"}`,
-        message: `${result.added} added · ${result.removed} removed · ${result.total} total`,
-      });
-    } catch (caught) {
-      showToast({
-        tone: "error",
-        title: "Source refresh failed",
-        message: caught instanceof Error
-          ? caught.message
-          : "The sources could not be refreshed.",
-      });
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
   return (
     <>
     <section className="binder-section">
       <div className="section-toolbar">
-        <div className="binder-toolbar-actions">
-          <CreatureSearch
-            query={query}
-            onQueryChange={setQuery}
-            activeFilter={activeSourceFilter}
-            defaultFilter={ALL_SOURCES}
-            onFilterChange={(filter) => onSourceFilterChange(filter || null)}
-            searchAriaLabel="Search creatures"
-            filterAriaLabel="Filter creatures by source"
-            filterOptions={[
-              { value: ALL_SOURCES, label: `All creatures (${entries.length})` },
-              {
-                value: MANUAL_SOURCE,
-                label: `Manually added (${sourceCounts.get(MANUAL_SOURCE) ?? 0})`,
-              },
-              ...sources.map((source) => ({
-                value: source.id,
-                label: `${source.name} (${sourceCounts.get(source.id) ?? 0})`,
-              })),
-            ]}
-          />
-          <div className="source-button-group">
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={onManageSources}
-              sx={{
-                height: 40,
-                borderRadius: "var(--radius-sm) 0 0 var(--radius-sm)",
-              }}
-            >
-              Sources
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              type="button"
-              onClick={refreshAllSources}
-              disabled={sources.length === 0 || refreshing}
-              aria-label="Refresh all sources"
-              title={sources.length === 0 ? "Add a source first" : "Refresh all sources"}
-              sx={{
-                height: 40,
-                minWidth: "2.45rem",
-                maxWidth: "2.45rem",
-                paddingInline: 0,
-                borderRadius: "0 var(--radius-sm) var(--radius-sm) 0",
-                borderLeftWidth: 0,
-              }}
-            >
-              <span className={refreshing ? "refresh-icon spinning" : "refresh-icon"} aria-hidden="true">↻</span>
-            </Button>
-          </div>
-          <Button
-            variant="contained"
-            size="small"
-            sx={{ height: 40 }}
-            onClick={onAddCreature}
-          >
-            Add creature
-          </Button>
-        </div>
+        <CreatureToolbar
+          entries={entries}
+          sources={sources}
+          sourceFilter={sourceFilter}
+          query={query}
+          onQueryChange={setQuery}
+          searchAriaLabel="Search creatures"
+          filterAriaLabel="Filter creatures by source"
+          onSourceFilterChange={onSourceFilterChange}
+          onManageSources={onManageSources}
+          onRefreshSources={onRefreshSources}
+          onAddCreature={onAddCreature}
+        />
       </div>
 
       {visibleEntries.length > 0 ? (
