@@ -629,30 +629,58 @@ async function buildPdf(
   const usableW = pageW - PAGE_MARGIN_MM * 2;
   const usableH = pageH - PAGE_MARGIN_MM * 2;
 
-  const miniGroups: MiniPdfData[][] = [];
-
+  const groupedEntries = new Map<string, PrintableMiniFigEntry[]>();
   for (const entry of validEntries) {
-    const img = await loadImage(getEntryImageSource(entry)!);
-    const widthMm = getEffectiveWidthMm(entry, miniSize);
+    const normalizedName = entry.name.trim().toLocaleLowerCase();
+    const key = normalizedName
+      ? `name:${normalizedName}`
+      : `entry:${entry.id}`;
+    const group = groupedEntries.get(key);
+    if (group) {
+      group.push(entry);
+    } else {
+      groupedEntries.set(key, [entry]);
+    }
+  }
+
+  const miniGroups: MiniPdfData[][] = [];
+  for (const entriesInGroup of groupedEntries.values()) {
+    entriesInGroup.sort(
+      (a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true }) ||
+        a.id.localeCompare(b.id),
+    );
+    const groupQuantity = entriesInGroup.reduce(
+      (total, entry) => total + entry.quantity,
+      0,
+    );
+    const groupName = entriesInGroup[0].name.trim();
     const minis: MiniPdfData[] = [];
-    for (let i = 0; i < entry.quantity; i++) {
-      const number = entry.quantity > 1 ? i + 1 : null;
-      const heightMm = miniHeightMm(
-        img,
-        widthMm,
-        entry.showName && !!entry.name,
-        number != null,
-        standBufferMm,
-      );
-      minis.push({
-        img,
-        name: entry.name,
-        showName: entry.showName,
-        number,
-        heightMm,
-        widthMm,
-        standBufferMm,
-      });
+    let groupNumber = 1;
+
+    for (const entry of entriesInGroup) {
+      const img = await loadImage(getEntryImageSource(entry)!);
+      const widthMm = getEffectiveWidthMm(entry, miniSize);
+      for (let i = 0; i < entry.quantity; i++) {
+        const number = groupQuantity > 1 ? groupNumber++ : null;
+        const name = groupName || entry.name;
+        const heightMm = miniHeightMm(
+          img,
+          widthMm,
+          entry.showName && !!name,
+          number != null,
+          standBufferMm,
+        );
+        minis.push({
+          img,
+          name,
+          showName: entry.showName,
+          number,
+          heightMm,
+          widthMm,
+          standBufferMm,
+        });
+      }
     }
     miniGroups.push(minis);
   }
