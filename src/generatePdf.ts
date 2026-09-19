@@ -612,6 +612,57 @@ function drawMiniToPdf(pdf: jsPDF, mini: MiniPdfData, ox: number, oy: number) {
   pdf.addImage(botUrl, "PNG", ox, botBandY - fadeMm, widthMm, bandMm + fadeMm);
 }
 
+async function drawCenterFoldPages(
+  pdf: jsPDF,
+  minis: MiniPdfData[],
+  pageW: number,
+  pageH: number,
+  usableW: number,
+): Promise<void> {
+  const rows: MiniPdfData[][] = [];
+  let row: MiniPdfData[] = [];
+  let rowWidth = 0;
+
+  const finishRow = () => {
+    if (row.length > 0) rows.push(row);
+    row = [];
+    rowWidth = 0;
+  };
+
+  for (const mini of minis) {
+    const nextWidth = row.length === 0
+      ? mini.widthMm
+      : rowWidth + SPACING_MM + mini.widthMm;
+    if (row.length > 0 && nextWidth > usableW) finishRow();
+    row.push(mini);
+    rowWidth += (row.length === 1 ? 0 : SPACING_MM) + mini.widthMm;
+  }
+  finishRow();
+
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+    if (rowIndex > 0) {
+      pdf.addPage();
+      await ensureJsPdfFont(pdf);
+    }
+
+    const pageRow = rows[rowIndex];
+    const rowWidthMm = pageRow.reduce(
+      (total, mini, index) => total + mini.widthMm + (index > 0 ? SPACING_MM : 0),
+      0,
+    );
+    let pageX = (pageW - rowWidthMm) / 2;
+
+    for (const mini of pageRow) {
+      // The front/back seam is exactly at the page's horizontal midpoint.
+      // Folding the whole sheet there keeps every miniature registered for
+      // gluing before the individual figures are cut out.
+      const pageY = pageH / 2 - mini.heightMm / 2;
+      drawMiniToPdf(pdf, mini, pageX, pageY);
+      pageX += mini.widthMm + SPACING_MM;
+    }
+  }
+}
+
 async function buildPdf(
   entries: PrintableMiniFigEntry[],
   format: PaperFormat = "a4",
@@ -689,6 +740,18 @@ async function buildPdf(
 
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format });
   await ensureJsPdfFont(pdf);
+
+  if (layout === "center-fold") {
+    const minis = miniGroups.flat();
+    const tooTall = minis.find((mini) => mini.heightMm > usableH);
+    if (tooTall) {
+      throw new Error(
+        `${tooTall.name || "A selected creature"} is too tall for the centered fold. Choose a smaller print scale or larger paper.`,
+      );
+    }
+    await drawCenterFoldPages(pdf, minis, pageW, pageH, usableW);
+    return pdf;
+  }
 
   let pageX = PAGE_MARGIN_MM;
   let pageY = PAGE_MARGIN_MM;

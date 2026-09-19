@@ -129,6 +129,11 @@ export function PrintBuilder({
       : ALL_SOURCES;
   const total = entries.reduce((sum, entry) => sum + entry.quantity, 0);
   const selectedKinds = entries.filter((entry) => entry.quantity > 0).length;
+  const layoutHint = printLayout === "center-fold"
+    ? "Lines every miniature up on the page fold so you can glue the sheet, fold it, then cut them out."
+    : printLayout === "per-creature"
+      ? "Starts each creature type on a separate page for easier cutting."
+      : "Fits miniatures across as many rows as needed.";
   const activePrintCatalogue =
     printCatalogues.find(
       (catalogue) => catalogue.id === activePrintCatalogueId,
@@ -602,9 +607,12 @@ export function PrintBuilder({
             <ToggleButton value="per-creature">
               Per creature
             </ToggleButton>
+            <ToggleButton value="center-fold">
+              Center fold
+            </ToggleButton>
           </ToggleButtonGroup>
           <small className="layout-hint">
-            Per creature starts each creature type on a separate page for easier cutting.
+            {layoutHint}
           </small>
         </div>
 

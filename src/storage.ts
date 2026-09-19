@@ -27,7 +27,11 @@ const DRIVE_SESSION_EXPIRY_BUFFER_MS = 30_000;
 
 const VALID_MINI_SIZES: MiniSize[] = [24, 28, 32];
 const VALID_PAPER_FORMATS: PaperFormat[] = ["a4", "a3"];
-const VALID_PRINT_LAYOUTS: PrintLayout[] = ["compact", "per-creature"];
+const VALID_PRINT_LAYOUTS: PrintLayout[] = [
+  "compact",
+  "per-creature",
+  "center-fold",
+];
 const VALID_CREATURE_SIZES: CreatureSize[] = [
   "tiny", "small", "medium", "large", "huge", "gargantuan",
 ];

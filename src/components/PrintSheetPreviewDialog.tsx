@@ -27,6 +27,12 @@ interface PreviewResult {
   error: string;
 }
 
+const layoutLabels: Record<PrintLayout, string> = {
+  compact: "Compact layout",
+  "per-creature": "Per-creature layout",
+  "center-fold": "Center-fold layout",
+};
+
 export function PrintSheetPreviewDialog({
   entries,
   format,
@@ -130,7 +136,7 @@ export function PrintSheetPreviewDialog({
             <h2 id="print-sheet-preview-title">Your print sheet</h2>
             <p>
               {total} miniature{total === 1 ? "" : "s"} · {format.toUpperCase()} · {miniSize}mm ·{" "}
-              {layout === "compact" ? "Compact layout" : "Per-creature layout"}
+              {layoutLabels[layout]}
             </p>
           </div>
         </header>
