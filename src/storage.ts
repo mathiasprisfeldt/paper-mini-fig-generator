@@ -56,6 +56,8 @@ export function migrateMiniFigEntry(e: unknown): MiniFigEntry {
     blurHash: typeof raw.blurHash === "string" ? raw.blurHash : null,
     sourceId: typeof raw.sourceId === "string" ? raw.sourceId : null,
     showName: typeof raw.showName === "boolean" ? raw.showName : true,
+    disableNumbering:
+      typeof raw.disableNumbering === "boolean" ? raw.disableNumbering : false,
     creatureSize: VALID_CREATURE_SIZES.includes(raw.creatureSize as CreatureSize)
       ? (raw.creatureSize as CreatureSize)
       : "medium",

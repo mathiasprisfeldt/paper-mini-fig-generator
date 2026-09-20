@@ -713,7 +713,10 @@ async function buildPdf(
       const img = await loadImage(getEntryImageSource(entry)!);
       const widthMm = getEffectiveWidthMm(entry, miniSize);
       for (let i = 0; i < entry.quantity; i++) {
-        const number = groupQuantity > 1 ? groupNumber++ : null;
+        const number = groupQuantity > 1 && !entry.disableNumbering
+          ? groupNumber
+          : null;
+        groupNumber += 1;
         const name = groupName || entry.name;
         const heightMm = miniHeightMm(
           img,
@@ -834,7 +837,7 @@ export async function renderPreview(
     img,
     entry.name,
     entry.showName,
-    number,
+    entry.disableNumbering ? null : number,
     widthMm,
     standBufferMm,
   );

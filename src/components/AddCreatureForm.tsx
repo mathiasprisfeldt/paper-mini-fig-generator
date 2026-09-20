@@ -116,6 +116,7 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
   const [imageUrl, setImageUrl] = useState("");
   const [creatureSize, setCreatureSize] = useState<CreatureSize>("medium");
   const [showName, setShowName] = useState(true);
+  const [disableNumbering, setDisableNumbering] = useState(false);
   const [error, setError] = useState("");
   const [adding, setAdding] = useState(false);
 
@@ -199,6 +200,7 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
         blurHash: null,
         sourceId: null,
         showName,
+        disableNumbering,
         creatureSize,
       });
       reset();
@@ -337,6 +339,19 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
             />
           }
           label="Print name on base"
+        />
+
+        <FormControlLabel
+          className="toggle-control"
+          sx={{ margin: 0, alignSelf: "center" }}
+          control={
+            <Checkbox
+              checked={disableNumbering}
+              onChange={(event) => setDisableNumbering(event.target.checked)}
+              size="small"
+            />
+          }
+          label="Disable numbering"
         />
 
         <div className="dialog-form-actions">

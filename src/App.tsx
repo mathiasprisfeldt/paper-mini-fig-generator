@@ -173,6 +173,7 @@ function createDriveSyncSignature(
         blurHash: entry.blurHash,
         sourceId: entry.sourceId,
         showName: entry.showName,
+        disableNumbering: entry.disableNumbering,
         creatureSize: entry.creatureSize,
       })),
     })),
@@ -459,6 +460,7 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
               blurHash: null,
               sourceId: source.id,
               showName: true,
+              disableNumbering: false,
               creatureSize: "medium",
             };
       });

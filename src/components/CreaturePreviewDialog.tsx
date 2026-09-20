@@ -74,6 +74,15 @@ export function CreaturePreviewDialog({
             />
             <span>Show name on base</span>
           </label>
+          <label className="creature-preview-checkbox">
+            <input
+              type="checkbox"
+              checked={entry.disableNumbering}
+              onChange={(event) =>
+                onUpdate(entry.id, { disableNumbering: event.target.checked })}
+            />
+            <span>Disable numbering</span>
+          </label>
         </aside>
         <div className="creature-preview-content">
           <FoldedMiniPreview
