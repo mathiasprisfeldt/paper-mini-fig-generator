@@ -25,6 +25,7 @@ export interface MiniFigEntry {
   blurHash: string | null;
   sourceId: string | null;
   showName: boolean;
+  disableNumbering: boolean;
   creatureSize: CreatureSize;
 }
 
