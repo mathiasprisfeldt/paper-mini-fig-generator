@@ -194,6 +194,7 @@ interface AppProps {
 }
 
 function App({ themeMode, onThemeModeChange }: AppProps) {
+  const showDebugTools = import.meta.env.DEV;
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? "";
   const googleAppId = import.meta.env.VITE_GOOGLE_APP_ID?.trim() ?? "";
   const googleDeveloperKey = import.meta.env.VITE_GOOGLE_API_KEY?.trim() ?? "";
@@ -1247,43 +1248,47 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
           </Tabs>
         </div>
       </header>
-      <IconButton
-        className="debug-menu-button"
-        aria-label="Debug tools"
-        aria-controls={debugMenuAnchor ? "debug-tools-menu" : undefined}
-        aria-expanded={debugMenuAnchor ? "true" : undefined}
-        aria-haspopup="menu"
-        onClick={(event) => setDebugMenuAnchor(event.currentTarget)}
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M9 9h6v6H9zM9 3v3m6-3v3M9 18v3m6-3v3M3 9h3m12 0h3M3 15h3m12 0h3" />
-          <rect x="6" y="6" width="12" height="12" rx="3" />
-        </svg>
-      </IconButton>
-      <Menu
-        id="debug-tools-menu"
-        anchorEl={debugMenuAnchor}
-        open={Boolean(debugMenuAnchor)}
-        onClose={() => setDebugMenuAnchor(null)}
-        anchorOrigin={{ horizontal: "left", vertical: "top" }}
-        transformOrigin={{ horizontal: "left", vertical: "bottom" }}
-      >
-        <MenuItem
-          onClick={() => setForcePlaceholders((current) => !current)}
-        >
-          <ListItemText
-            primary="Show placeholders only"
-            secondary="Skip thumbnail image loading"
-          />
-          <Switch
-            edge="end"
-            checked={forcePlaceholders}
-            slotProps={{ input: { "aria-label": "Show placeholders only" } }}
-            onClick={(event) => event.stopPropagation()}
-            onChange={(_, checked) => setForcePlaceholders(checked)}
-          />
-        </MenuItem>
-      </Menu>
+      {showDebugTools && (
+        <>
+          <IconButton
+            className="debug-menu-button"
+            aria-label="Debug tools"
+            aria-controls={debugMenuAnchor ? "debug-tools-menu" : undefined}
+            aria-expanded={debugMenuAnchor ? "true" : undefined}
+            aria-haspopup="menu"
+            onClick={(event) => setDebugMenuAnchor(event.currentTarget)}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 9h6v6H9zM9 3v3m6-3v3M9 18v3m6-3v3M3 9h3m12 0h3M3 15h3m12 0h3" />
+              <rect x="6" y="6" width="12" height="12" rx="3" />
+            </svg>
+          </IconButton>
+          <Menu
+            id="debug-tools-menu"
+            anchorEl={debugMenuAnchor}
+            open={Boolean(debugMenuAnchor)}
+            onClose={() => setDebugMenuAnchor(null)}
+            anchorOrigin={{ horizontal: "left", vertical: "top" }}
+            transformOrigin={{ horizontal: "left", vertical: "bottom" }}
+          >
+            <MenuItem
+              onClick={() => setForcePlaceholders((current) => !current)}
+            >
+              <ListItemText
+                primary="Show placeholders only"
+                secondary="Skip thumbnail image loading"
+              />
+              <Switch
+                edge="end"
+                checked={forcePlaceholders}
+                slotProps={{ input: { "aria-label": "Show placeholders only" } }}
+                onClick={(event) => event.stopPropagation()}
+                onChange={(_, checked) => setForcePlaceholders(checked)}
+              />
+            </MenuItem>
+          </Menu>
+        </>
+      )}
 
       {view !== "settings" && !driveAccessToken && driveSyncPanel}
 
