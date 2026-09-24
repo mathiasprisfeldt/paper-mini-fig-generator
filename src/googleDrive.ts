@@ -145,6 +145,10 @@ function normalizeSource(value: unknown): CreatureSource | null {
     typeof source.updatedAt === "number" && Number.isFinite(source.updatedAt)
       ? source.updatedAt
       : 0;
+  const createdAt =
+    typeof source.createdAt === "number" && Number.isFinite(source.createdAt)
+      ? source.createdAt
+      : 0;
   if (
     source.type === "drive" &&
     typeof source.folderId === "string" &&
@@ -156,6 +160,7 @@ function normalizeSource(value: unknown): CreatureSource | null {
       name: source.name,
       folderId: source.folderId,
       folderName: source.folderName,
+      createdAt,
       updatedAt,
     };
   }
@@ -170,6 +175,7 @@ function normalizeSource(value: unknown): CreatureSource | null {
       name: source.name,
       url: source.url,
       selector: source.selector,
+      createdAt,
       updatedAt,
     };
   }

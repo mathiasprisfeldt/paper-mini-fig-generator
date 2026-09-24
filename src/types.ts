@@ -3,6 +3,7 @@ export type MiniSize = 24 | 28 | 32;
 export type PaperFormat = "a4" | "a3";
 export type PrintLayout = "compact" | "per-creature" | "center-fold";
 export type ThemeMode = "light" | "dark" | "auto";
+export type CreatureOrder = "name" | "source-added";
 
 export interface MiniFigStyle {
   standBufferMm: number;
@@ -52,6 +53,7 @@ export interface PrintCatalogue {
 interface CreatureSourceBase {
   id: string;
   name: string;
+  createdAt: number;
   updatedAt: number;
 }
 

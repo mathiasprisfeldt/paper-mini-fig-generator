@@ -1055,7 +1055,7 @@
 }
 
 .creature-search {
-  width: min(280px, 45vw);
+  width: min(320px, 45vw);
   flex-shrink: 0;
   margin-right: auto;
 }
@@ -1988,7 +1988,8 @@
   padding-top: 0.5rem;
 }
 
-.creature-search-filter-button svg {
+.creature-search-filter-button svg,
+.creature-search-order-button svg {
   width: 1.1rem;
   height: 1.1rem;
   fill: none;
