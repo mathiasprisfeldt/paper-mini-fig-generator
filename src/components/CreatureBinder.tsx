@@ -12,10 +12,12 @@ import {
   WindowScroller,
 } from "react-virtualized";
 import type {
+  CreatureOrder,
   CreatureSource,
   MiniFigEntry,
   SourceRefreshResult,
 } from "../types";
+import { sortCreatureEntries } from "../creatureOrder";
 import { CreatureToolbar } from "./CreatureToolbar";
 import { CreatureThumbnail } from "./CreatureThumbnail";
 import {
@@ -30,6 +32,8 @@ interface Props {
   imageRetryKey: string;
   sources: CreatureSource[];
   sourceFilter: string | null;
+  order: CreatureOrder;
+  onOrderChange: (order: CreatureOrder) => void;
   onRemove: (id: string) => void;
   onPreview: (id: string) => void;
   onAddCreature: () => void;
@@ -315,6 +319,8 @@ export function CreatureBinder({
   imageRetryKey,
   sources,
   sourceFilter,
+  order,
+  onOrderChange,
   onRemove,
   onPreview,
   onAddCreature,
@@ -332,8 +338,8 @@ export function CreatureBinder({
 
   const visibleEntries = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    return [...entries]
-      .filter((entry) => {
+    return sortCreatureEntries(
+      entries.filter((entry) => {
         const matchesQuery =
           !normalized || entry.name.toLowerCase().includes(normalized);
         const matchesSource =
@@ -342,9 +348,11 @@ export function CreatureBinder({
             ? !entry.sourceId
             : entry.sourceId === activeSourceFilter);
         return matchesQuery && matchesSource;
-      })
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [activeSourceFilter, entries, query]);
+      }),
+      sources,
+      order,
+    );
+  }, [activeSourceFilter, entries, order, query, sources]);
 
   return (
     <>
@@ -354,6 +362,8 @@ export function CreatureBinder({
           entries={entries}
           sources={sources}
           sourceFilter={sourceFilter}
+          order={order}
+          onOrderChange={onOrderChange}
           query={query}
           onQueryChange={setQuery}
           searchAriaLabel="Search creatures"

@@ -25,8 +25,8 @@ import { SourceAccessError } from "../sourceDiscovery";
 import { AppModal } from "./AppModal";
 
 export type SourceDraft =
-  | Omit<HtmlCreatureSource, "id" | "updatedAt">
-  | Omit<DriveCreatureSource, "id" | "updatedAt">;
+  | Omit<HtmlCreatureSource, "id" | "createdAt" | "updatedAt">
+  | Omit<DriveCreatureSource, "id" | "createdAt" | "updatedAt">;
 
 interface Props {
   sources: CreatureSource[];

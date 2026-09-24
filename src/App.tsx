@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import type {
   Catalogue,
+  CreatureOrder,
   CreatureSource,
   MiniFigEntry,
   MiniFigStyle,
@@ -222,6 +223,7 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
     new URL(window.location.href).searchParams.get(PREVIEW_QUERY_PARAM),
   );
   const [sources, setSources] = useState<CreatureSource[]>(loadSources);
+  const [creatureOrder, setCreatureOrder] = useState<CreatureOrder>("name");
   const [paperFormat, setPaperFormatState] = useState<PaperFormat>(getPaperFormat);
   const [miniSize, setMiniSizeState] = useState<MiniSize>(getMiniSize);
   const [miniFigStyle, setMiniFigStyle] = useState<MiniFigStyle>(getMiniFigStyle);
@@ -536,6 +538,7 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
     const source: CreatureSource = {
       ...draft,
       id: crypto.randomUUID(),
+      createdAt: Date.now(),
       updatedAt: Date.now(),
     };
     if (source.type === "drive" && !driveAccessToken) {
@@ -1298,6 +1301,8 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
             entries={entries}
             sources={sources}
             sourceFilter={sourceFilter}
+            order={creatureOrder}
+            onOrderChange={setCreatureOrder}
             forcePlaceholders={forcePlaceholders}
             imageRetryKey={driveAccessToken ? "connected" : "disconnected"}
             onRemove={removeEntry}
@@ -1319,6 +1324,8 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
             entries={printableEntries}
             sources={sources}
             sourceFilter={sourceFilter}
+            order={creatureOrder}
+            onOrderChange={setCreatureOrder}
             printCatalogues={printCatalogues}
             activePrintCatalogueId={activePrintCatalogueId}
             paperFormat={activePaperFormat}

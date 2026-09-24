@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Button } from "@mui/material";
 import type {
+  CreatureOrder,
   CreatureSource,
   MiniFigEntry,
   SourceRefreshResult,
@@ -15,6 +16,8 @@ interface Props {
   entries: MiniFigEntry[];
   sources: CreatureSource[];
   sourceFilter: string | null;
+  order: CreatureOrder;
+  onOrderChange: (order: CreatureOrder) => void;
   query: string;
   searchAriaLabel: string;
   filterAriaLabel: string;
@@ -30,6 +33,8 @@ export function CreatureToolbar({
   entries,
   sources,
   sourceFilter,
+  order,
+  onOrderChange,
   query,
   searchAriaLabel,
   filterAriaLabel,
@@ -57,6 +62,8 @@ export function CreatureToolbar({
       <CreatureSearch
         query={query}
         onQueryChange={onQueryChange}
+        order={order}
+        onOrderChange={onOrderChange}
         activeFilter={activeSourceFilter}
         defaultFilter={ALL_SOURCES}
         onFilterChange={(filter) => onSourceFilterChange(filter || null)}
