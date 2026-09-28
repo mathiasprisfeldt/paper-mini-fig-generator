@@ -5,14 +5,14 @@ export function sortCreatureEntries<T extends MiniFigEntry>(
   sources: CreatureSource[],
   order: CreatureOrder,
 ): T[] {
-  if (order === "name") {
-    return [...entries].sort((a, b) => a.name.localeCompare(b.name));
+  const direction = order.direction === "asc" ? 1 : -1;
+  if (order.field === "name") {
+    return [...entries].sort((a, b) => direction * a.name.localeCompare(b.name));
   }
 
   const sourceOrder = new Map(
     sources.map((source, index) => [source.id, { date: source.createdAt, index }]),
   );
-  const direction = order === "created-asc" ? 1 : -1;
   return [...entries].sort((a, b) => {
     const first = a.sourceId ? sourceOrder.get(a.sourceId) : undefined;
     const second = b.sourceId ? sourceOrder.get(b.sourceId) : undefined;
@@ -30,6 +30,6 @@ export function sortCreatureEntries<T extends MiniFigEntry>(
       const bySourcePosition = direction * (first.index - second.index);
       if (bySourcePosition) return bySourcePosition;
     }
-    return a.name.localeCompare(b.name);
+    return direction * a.name.localeCompare(b.name);
   });
 }

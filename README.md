@@ -126,8 +126,8 @@ The app fetches that page, resolves relative links such as
 extensions. The directory page and its images must both permit cross-origin
 requests. Source definitions and the last discovered creature list are synced
 through Drive, and users can refresh or remove sources from the binder.
-The binder and print picker can order creatures by name or creation date, with
-newest or oldest first. For Drive sources, the creation date comes from each
+The binder and print picker can order creatures by name or creation date in
+either direction. For Drive sources, the creation date comes from each
 image file's Drive metadata.
 HTML directory pages do not provide a reliable file creation date, so newly
 discovered entries use the date they were added to the binder. Older entries

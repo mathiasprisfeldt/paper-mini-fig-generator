@@ -224,7 +224,10 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
     new URL(window.location.href).searchParams.get(PREVIEW_QUERY_PARAM),
   );
   const [sources, setSources] = useState<CreatureSource[]>(loadSources);
-  const [creatureOrder, setCreatureOrder] = useState<CreatureOrder>("name");
+  const [creatureOrder, setCreatureOrder] = useState<CreatureOrder>({
+    field: "name",
+    direction: "asc",
+  });
   const [paperFormat, setPaperFormatState] = useState<PaperFormat>(getPaperFormat);
   const [miniSize, setMiniSizeState] = useState<MiniSize>(getMiniSize);
   const [miniFigStyle, setMiniFigStyle] = useState<MiniFigStyle>(getMiniFigStyle);
