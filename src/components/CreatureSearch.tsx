@@ -1,7 +1,10 @@
 import { useState, type MouseEvent } from "react";
 import {
+  Divider,
   IconButton,
   InputAdornment,
+  ListItemText,
+  ListSubheader,
   Menu,
   MenuItem,
   TextField,
@@ -54,9 +57,8 @@ export function CreatureSearch({
     setFilterMenuAnchor(null);
   };
 
-  const selectOrder = (nextOrder: CreatureOrder) => {
-    onOrderChange(nextOrder);
-    setOrderMenuAnchor(null);
+  const selectOrder = (change: Partial<CreatureOrder>) => {
+    onOrderChange({ ...order, ...change });
   };
 
   return (
@@ -93,10 +95,10 @@ export function CreatureSearch({
                 )}
                 <IconButton
                   className="creature-search-order-button"
-                  color={order === "source-added" ? "primary" : "default"}
+                  color={order.field !== "name" || order.direction !== "asc" ? "primary" : "default"}
                   size="small"
-                  aria-label="Order creatures"
-                  title="Order creatures"
+                  aria-label="Sort creatures"
+                  title="Sort creatures"
                   aria-controls={orderMenuAnchor ? "creature-order-menu" : undefined}
                   aria-haspopup="menu"
                   aria-expanded={orderMenuAnchor ? "true" : undefined}
@@ -105,7 +107,10 @@ export function CreatureSearch({
                   }
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 7h12M4 12h8M4 17h4M19 6v12m-4-4 4 4 4-4" />
+                    <path d="M4 7h12M4 12h8M4 17h4" />
+                    <path d={order.direction === "asc"
+                      ? "M19 18V6m-4 4 4-4 4 4"
+                      : "M19 6v12m-4-4 4 4 4-4"} />
                   </svg>
                 </IconButton>
               </InputAdornment>
@@ -145,11 +150,20 @@ export function CreatureSearch({
         anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
         transformOrigin={{ horizontal: "right", vertical: "top" }}
       >
-        <MenuItem selected={order === "name"} onClick={() => selectOrder("name")}>
-          A-Z
+        <ListSubheader disableSticky>Sort by</ListSubheader>
+        <MenuItem selected={order.field === "name"} onClick={() => selectOrder({ field: "name" })}>
+          Name
         </MenuItem>
-        <MenuItem selected={order === "source-added"} onClick={() => selectOrder("source-added")}>
+        <MenuItem selected={order.field === "created"} onClick={() => selectOrder({ field: "created" })}>
           Created
+        </MenuItem>
+        <Divider />
+        <ListSubheader disableSticky>Direction</ListSubheader>
+        <MenuItem selected={order.direction === "asc"} onClick={() => selectOrder({ direction: "asc" })}>
+          <ListItemText primary="Ascending" secondary={order.field === "name" ? "A–Z" : "Oldest first"} />
+        </MenuItem>
+        <MenuItem selected={order.direction === "desc"} onClick={() => selectOrder({ direction: "desc" })}>
+          <ListItemText primary="Descending" secondary={order.field === "name" ? "Z–A" : "Newest first"} />
         </MenuItem>
       </Menu>
     </>

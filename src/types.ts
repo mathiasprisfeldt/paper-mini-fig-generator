@@ -3,7 +3,10 @@ export type MiniSize = 24 | 28 | 32;
 export type PaperFormat = "a4" | "a3";
 export type PrintLayout = "compact" | "per-creature" | "center-fold";
 export type ThemeMode = "light" | "dark" | "auto";
-export type CreatureOrder = "name" | "source-added";
+export interface CreatureOrder {
+  field: "name" | "created";
+  direction: "asc" | "desc";
+}
 
 export interface MiniFigStyle {
   standBufferMm: number;
@@ -20,6 +23,7 @@ export type CreatureSize =
 export interface MiniFigEntry {
   id: string;
   name: string;
+  createdAt: number | null;
   imageDataUrl: string | null;
   imageUrl: string | null;
   imageDriveFileId: string | null;

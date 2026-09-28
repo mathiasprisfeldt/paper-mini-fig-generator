@@ -5,8 +5,9 @@ export function sortCreatureEntries<T extends MiniFigEntry>(
   sources: CreatureSource[],
   order: CreatureOrder,
 ): T[] {
-  if (order === "name") {
-    return [...entries].sort((a, b) => a.name.localeCompare(b.name));
+  const direction = order.direction === "asc" ? 1 : -1;
+  if (order.field === "name") {
+    return [...entries].sort((a, b) => direction * a.name.localeCompare(b.name));
   }
 
   const sourceOrder = new Map(
@@ -15,15 +16,20 @@ export function sortCreatureEntries<T extends MiniFigEntry>(
   return [...entries].sort((a, b) => {
     const first = a.sourceId ? sourceOrder.get(a.sourceId) : undefined;
     const second = b.sourceId ? sourceOrder.get(b.sourceId) : undefined;
-    if (first && !second) return -1;
-    if (!first && second) return 1;
-    if (first && second) {
-      // Older libraries have no creation date; their source list retains insertion order.
-      const byDate = second.date - first.date;
-      if (byDate) return byDate;
-      const bySourcePosition = second.index - first.index;
+    // Use the source date only for entries saved before per-image dates existed.
+    const firstDate = a.createdAt ?? first?.date ?? null;
+    const secondDate = b.createdAt ?? second?.date ?? null;
+    if (firstDate === null || firstDate === 0) {
+      if (secondDate !== null && secondDate !== 0) return 1;
+    } else if (secondDate === null || secondDate === 0) {
+      return -1;
+    } else if (secondDate !== firstDate) {
+      return direction * (firstDate - secondDate);
+    }
+    if (a.createdAt === null && b.createdAt === null && first && second) {
+      const bySourcePosition = direction * (first.index - second.index);
       if (bySourcePosition) return bySourcePosition;
     }
-    return a.name.localeCompare(b.name);
+    return direction * a.name.localeCompare(b.name);
   });
 }

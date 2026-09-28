@@ -167,6 +167,7 @@ function createDriveSyncSignature(
       entries: catalogue.entries.map((entry) => ({
         id: entry.id,
         name: entry.name,
+        createdAt: entry.createdAt,
         imageData: entry.imageDriveFileId
           ? null
           : hashImageData(entry.imageDataUrl),
@@ -223,7 +224,10 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
     new URL(window.location.href).searchParams.get(PREVIEW_QUERY_PARAM),
   );
   const [sources, setSources] = useState<CreatureSource[]>(loadSources);
-  const [creatureOrder, setCreatureOrder] = useState<CreatureOrder>("name");
+  const [creatureOrder, setCreatureOrder] = useState<CreatureOrder>({
+    field: "name",
+    direction: "asc",
+  });
   const [paperFormat, setPaperFormatState] = useState<PaperFormat>(getPaperFormat);
   const [miniSize, setMiniSizeState] = useState<MiniSize>(getMiniSize);
   const [miniFigStyle, setMiniFigStyle] = useState<MiniFigStyle>(getMiniFigStyle);
@@ -443,6 +447,7 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
         return saved
           ? {
               ...saved,
+              createdAt: item.createdAt ?? saved.createdAt,
               imageDataUrl: item.imageDataUrl,
               imageUrl: item.imageUrl,
               imageDriveFileId: item.imageDriveFileId,
@@ -457,6 +462,7 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
           : {
               id: item.id,
               name: item.name,
+              createdAt: item.createdAt ?? (source.type === "html" ? Date.now() : null),
               imageDataUrl: item.imageDataUrl,
               imageUrl: item.imageUrl,
               imageDriveFileId: item.imageDriveFileId,
