@@ -93,7 +93,7 @@ export function CreatureSearch({
                 )}
                 <IconButton
                   className="creature-search-order-button"
-                  color={order === "created" ? "primary" : "default"}
+                  color={order !== "name" ? "primary" : "default"}
                   size="small"
                   aria-label="Order creatures"
                   title="Order creatures"
@@ -105,7 +105,10 @@ export function CreatureSearch({
                   }
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 7h12M4 12h8M4 17h4M19 6v12m-4-4 4 4 4-4" />
+                    <path d="M4 7h12M4 12h8M4 17h4" />
+                    <path d={order === "created-asc"
+                      ? "M19 18V6m-4 4 4-4 4 4"
+                      : "M19 6v12m-4-4 4 4 4-4"} />
                   </svg>
                 </IconButton>
               </InputAdornment>
@@ -149,7 +152,10 @@ export function CreatureSearch({
           A-Z
         </MenuItem>
         <MenuItem selected={order === "created"} onClick={() => selectOrder("created")}>
-          Created
+          Created: newest first
+        </MenuItem>
+        <MenuItem selected={order === "created-asc"} onClick={() => selectOrder("created-asc")}>
+          Created: oldest first
         </MenuItem>
       </Menu>
     </>
