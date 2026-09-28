@@ -112,6 +112,7 @@ interface DriveFile {
   id: string;
   name: string;
   mimeType?: string;
+  createdTime?: string;
 }
 
 interface DriveFileList {
@@ -607,7 +608,7 @@ export async function discoverDriveFolderCreatures(
     const params = new URLSearchParams({
       spaces: "drive",
       q: `'${source.folderId.replaceAll("'", "\\'")}' in parents and trashed = false and mimeType contains 'image/'`,
-      fields: "nextPageToken,files(id,name,mimeType)",
+      fields: "nextPageToken,files(id,name,mimeType,createdTime)",
       pageSize: String(DRIVE_SOURCE_IMAGE_LIMIT),
       orderBy: "name",
       includeItemsFromAllDrives: "true",
@@ -634,6 +635,9 @@ export async function discoverDriveFolderCreatures(
   return files.map((file) => ({
     id: `source-${source.id}-${file.id}`,
     name: file.name.replace(/\.[^.]+$/, ""),
+    createdAt: file.createdTime && Number.isFinite(Date.parse(file.createdTime))
+      ? Date.parse(file.createdTime)
+      : null,
     imageDataUrl: null,
     imageUrl: null,
     imageDriveFileId: file.id,

@@ -93,7 +93,7 @@ export function CreatureSearch({
                 )}
                 <IconButton
                   className="creature-search-order-button"
-                  color={order === "source-added" ? "primary" : "default"}
+                  color={order === "created" ? "primary" : "default"}
                   size="small"
                   aria-label="Order creatures"
                   title="Order creatures"
@@ -148,7 +148,7 @@ export function CreatureSearch({
         <MenuItem selected={order === "name"} onClick={() => selectOrder("name")}>
           A-Z
         </MenuItem>
-        <MenuItem selected={order === "source-added"} onClick={() => selectOrder("source-added")}>
+        <MenuItem selected={order === "created"} onClick={() => selectOrder("created")}>
           Created
         </MenuItem>
       </Menu>

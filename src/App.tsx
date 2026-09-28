@@ -167,6 +167,7 @@ function createDriveSyncSignature(
       entries: catalogue.entries.map((entry) => ({
         id: entry.id,
         name: entry.name,
+        createdAt: entry.createdAt,
         imageData: entry.imageDriveFileId
           ? null
           : hashImageData(entry.imageDataUrl),
@@ -443,6 +444,7 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
         return saved
           ? {
               ...saved,
+              createdAt: item.createdAt ?? saved.createdAt,
               imageDataUrl: item.imageDataUrl,
               imageUrl: item.imageUrl,
               imageDriveFileId: item.imageDriveFileId,
@@ -457,6 +459,7 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
           : {
               id: item.id,
               name: item.name,
+              createdAt: item.createdAt ?? (source.type === "html" ? Date.now() : null),
               imageDataUrl: item.imageDataUrl,
               imageUrl: item.imageUrl,
               imageDriveFileId: item.imageDriveFileId,

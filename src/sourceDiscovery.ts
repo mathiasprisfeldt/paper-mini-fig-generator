@@ -5,6 +5,7 @@ const IMAGE_EXTENSION = /\.(?:avif|gif|jpe?g|png|svg|webp)$/i;
 export interface DiscoveredCreature {
   id: string;
   name: string;
+  createdAt: number | null;
   imageDataUrl: string | null;
   imageUrl: string | null;
   imageDriveFileId: string | null;
@@ -94,6 +95,8 @@ export async function discoverSourceCreatures(
     discovered.set(normalizedUrl, {
       id: `source-${source.id}-${stableHash(normalizedUrl)}`,
       name,
+      // A directory page has no reliable creation timestamp for each file.
+      createdAt: null,
       imageDataUrl: null,
       imageUrl: normalizedUrl,
       imageDriveFileId: null,
