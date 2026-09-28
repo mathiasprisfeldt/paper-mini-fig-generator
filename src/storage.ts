@@ -46,6 +46,9 @@ export function migrateMiniFigEntry(e: unknown): MiniFigEntry {
         ? raw.id
         : crypto.randomUUID(),
     name: typeof raw.name === "string" ? raw.name : "",
+    createdAt: typeof raw.createdAt === "number" && Number.isFinite(raw.createdAt)
+      ? raw.createdAt
+      : null,
     imageDataUrl:
       typeof raw.imageDataUrl === "string" ? raw.imageDataUrl : null,
     imageUrl: typeof raw.imageUrl === "string" ? raw.imageUrl : null,

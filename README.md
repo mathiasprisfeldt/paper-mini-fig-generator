@@ -126,6 +126,11 @@ The app fetches that page, resolves relative links such as
 extensions. The directory page and its images must both permit cross-origin
 requests. Source definitions and the last discovered creature list are synced
 through Drive, and users can refresh or remove sources from the binder.
+The binder and print picker can order creatures by name or creation date. For
+Drive sources, the creation date comes from each image file's Drive metadata.
+HTML directory pages do not provide a reliable file creation date, so newly
+discovered entries use the date they were added to the binder. Older entries
+without an individual date fall back to their source's creation date.
 
 A source can alternatively be a Google Drive folder. The official Google Picker
 lets the user choose one folder; image files directly inside it become binder
