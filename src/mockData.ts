@@ -19,6 +19,7 @@ function mockCreature([id, name, creatureSize, color, shape]: typeof creatures[n
   return {
     id: `mock-${id}`,
     name,
+    createdAt: Date.UTC(2026, 9, 1 + creatures.findIndex((creature) => creature[0] === id)),
     creatureSize,
     imageDataUrl: null,
     imageUrl: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,

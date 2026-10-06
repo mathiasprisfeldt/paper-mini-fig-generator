@@ -112,6 +112,7 @@ interface DriveFile {
   id: string;
   name: string;
   mimeType?: string;
+  createdTime?: string;
 }
 
 interface DriveFileList {
@@ -145,6 +146,10 @@ function normalizeSource(value: unknown): CreatureSource | null {
     typeof source.updatedAt === "number" && Number.isFinite(source.updatedAt)
       ? source.updatedAt
       : 0;
+  const createdAt =
+    typeof source.createdAt === "number" && Number.isFinite(source.createdAt)
+      ? source.createdAt
+      : 0;
   if (
     source.type === "drive" &&
     typeof source.folderId === "string" &&
@@ -156,6 +161,7 @@ function normalizeSource(value: unknown): CreatureSource | null {
       name: source.name,
       folderId: source.folderId,
       folderName: source.folderName,
+      createdAt,
       updatedAt,
     };
   }
@@ -170,6 +176,7 @@ function normalizeSource(value: unknown): CreatureSource | null {
       name: source.name,
       url: source.url,
       selector: source.selector,
+      createdAt,
       updatedAt,
     };
   }
@@ -601,7 +608,7 @@ export async function discoverDriveFolderCreatures(
     const params = new URLSearchParams({
       spaces: "drive",
       q: `'${source.folderId.replaceAll("'", "\\'")}' in parents and trashed = false and mimeType contains 'image/'`,
-      fields: "nextPageToken,files(id,name,mimeType)",
+      fields: "nextPageToken,files(id,name,mimeType,createdTime)",
       pageSize: String(DRIVE_SOURCE_IMAGE_LIMIT),
       orderBy: "name",
       includeItemsFromAllDrives: "true",
@@ -628,6 +635,9 @@ export async function discoverDriveFolderCreatures(
   return files.map((file) => ({
     id: `source-${source.id}-${file.id}`,
     name: file.name.replace(/\.[^.]+$/, ""),
+    createdAt: file.createdTime && Number.isFinite(Date.parse(file.createdTime))
+      ? Date.parse(file.createdTime)
+      : null,
     imageDataUrl: null,
     imageUrl: null,
     imageDriveFileId: file.id,

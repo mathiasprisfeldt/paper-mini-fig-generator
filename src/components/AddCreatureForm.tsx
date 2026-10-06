@@ -195,6 +195,7 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
       await onAdd({
         id: crypto.randomUUID(),
         name: name.trim(),
+        createdAt: Date.now(),
         ...source,
         imageDriveFileId: null,
         blurHash: null,

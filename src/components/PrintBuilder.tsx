@@ -24,6 +24,7 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import type {
+  CreatureOrder,
   PaperFormat,
   PrintableMiniFigEntry,
   PrintCatalogue,
@@ -32,6 +33,7 @@ import type {
   CreatureSource,
   SourceRefreshResult,
 } from "../types";
+import { sortCreatureEntries } from "../creatureOrder";
 import { AppModal } from "./AppModal";
 import { CreatureToolbar } from "./CreatureToolbar";
 import { CreatureThumbnail } from "./CreatureThumbnail";
@@ -55,6 +57,8 @@ interface Props {
   entries: PrintableMiniFigEntry[];
   sources: CreatureSource[];
   sourceFilter: string | null;
+  order: CreatureOrder;
+  onOrderChange: (order: CreatureOrder) => void;
   printCatalogues: PrintCatalogue[];
   activePrintCatalogueId: string | null;
   paperFormat: PaperFormat;
@@ -87,6 +91,8 @@ export function PrintBuilder({
   entries,
   sources,
   sourceFilter,
+  order,
+  onOrderChange,
   printCatalogues,
   activePrintCatalogueId,
   paperFormat,
@@ -171,8 +177,8 @@ export function PrintBuilder({
   };
   const visibleEntries = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    return [...entries]
-      .filter((entry) => {
+    return sortCreatureEntries(
+      entries.filter((entry) => {
         const matchesQuery =
           !normalized || entry.name.toLowerCase().includes(normalized);
         const matchesSelection =
@@ -183,9 +189,11 @@ export function PrintBuilder({
             ? !entry.sourceId
             : entry.sourceId === activeSourceFilter);
         return matchesQuery && matchesSelection && matchesSource;
-      })
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [activeSourceFilter, entries, entryFilter, query]);
+      }),
+      sources,
+      order,
+    );
+  }, [activeSourceFilter, entries, entryFilter, order, query, sources]);
   return (
     <div className="print-layout">
       <section className="print-picker">
@@ -194,6 +202,8 @@ export function PrintBuilder({
               entries={entries}
               sources={sources}
               sourceFilter={sourceFilter}
+              order={order}
+              onOrderChange={onOrderChange}
               query={query}
               onQueryChange={setQuery}
               searchAriaLabel="Search print creatures"

@@ -46,6 +46,9 @@ export function migrateMiniFigEntry(e: unknown): MiniFigEntry {
         ? raw.id
         : crypto.randomUUID(),
     name: typeof raw.name === "string" ? raw.name : "",
+    createdAt: typeof raw.createdAt === "number" && Number.isFinite(raw.createdAt)
+      ? raw.createdAt
+      : null,
     imageDataUrl:
       typeof raw.imageDataUrl === "string" ? raw.imageDataUrl : null,
     imageUrl: typeof raw.imageUrl === "string" ? raw.imageUrl : null,
@@ -275,6 +278,10 @@ export function loadSources(): CreatureSource[] {
         typeof source.updatedAt === "number" && Number.isFinite(source.updatedAt)
           ? source.updatedAt
           : 0;
+      const createdAt =
+        typeof source.createdAt === "number" && Number.isFinite(source.createdAt)
+          ? source.createdAt
+          : 0;
       if (
         source.type === "drive" &&
         typeof source.folderId === "string" &&
@@ -286,6 +293,7 @@ export function loadSources(): CreatureSource[] {
           name: source.name,
           folderId: source.folderId,
           folderName: source.folderName,
+          createdAt,
           updatedAt,
         });
         continue;
@@ -303,6 +311,7 @@ export function loadSources(): CreatureSource[] {
         name: source.name,
         url: source.url,
         selector: source.selector,
+        createdAt,
         updatedAt,
       });
     }
