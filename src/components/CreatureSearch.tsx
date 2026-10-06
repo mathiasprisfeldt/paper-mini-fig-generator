@@ -1,5 +1,7 @@
 import { useState, type MouseEvent } from "react";
 import {
+  Checkbox,
+  Divider,
   IconButton,
   InputAdornment,
   Menu,
@@ -21,6 +23,8 @@ interface Props {
   defaultFilter?: string;
   onFilterChange?: (filter: string) => void;
   filterAriaLabel?: string;
+  printedOnly?: boolean;
+  onPrintedOnlyChange?: (printedOnly: boolean) => void;
 }
 
 export function CreatureSearch({
@@ -32,6 +36,8 @@ export function CreatureSearch({
   onFilterChange,
   searchAriaLabel,
   filterAriaLabel,
+  printedOnly = false,
+  onPrintedOnlyChange,
 }: Props) {
   const [filterMenuAnchor, setFilterMenuAnchor] = useState<HTMLElement | null>(null);
   const hasFilterMenu = Boolean(
@@ -41,7 +47,7 @@ export function CreatureSearch({
       && onFilterChange
       && filterAriaLabel,
   );
-  const hasActiveFilter = hasFilterMenu && activeFilter !== defaultFilter;
+  const hasActiveFilter = hasFilterMenu && (activeFilter !== defaultFilter || printedOnly);
 
   const selectFilter = (filter: string) => {
     onFilterChange?.(filter);
@@ -92,6 +98,21 @@ export function CreatureSearch({
         anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
         transformOrigin={{ horizontal: "right", vertical: "top" }}
       >
+        {onPrintedOnlyChange && (
+          <MenuItem
+            role="menuitemcheckbox"
+            aria-checked={printedOnly}
+            selected={printedOnly}
+            onClick={() => {
+              onPrintedOnlyChange(!printedOnly);
+              setFilterMenuAnchor(null);
+            }}
+          >
+            <Checkbox checked={printedOnly} tabIndex={-1} disableRipple sx={{ pointerEvents: "none" }} />
+            Printed only
+          </MenuItem>
+        )}
+        {onPrintedOnlyChange && <Divider />}
         {filterOptions?.map((option) => (
           <MenuItem
             key={option.value}
@@ -102,7 +123,11 @@ export function CreatureSearch({
           </MenuItem>
         ))}
         {hasActiveFilter && (
-          <MenuItem onClick={() => selectFilter(defaultFilter ?? "")}>
+          <MenuItem onClick={() => {
+            onFilterChange?.(defaultFilter ?? "");
+            onPrintedOnlyChange?.(false);
+            setFilterMenuAnchor(null);
+          }}>
             Clear filter
           </MenuItem>
         )}

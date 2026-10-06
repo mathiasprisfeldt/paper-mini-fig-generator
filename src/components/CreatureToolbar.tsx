@@ -24,9 +24,24 @@ interface Props {
   onRefreshSources: () => Promise<SourceRefreshResult>;
   onAddCreature: () => void;
   children?: ReactNode;
+  printedOnly?: boolean;
+  onPrintedOnlyChange?: (printedOnly: boolean) => void;
 }
 
-export function CreatureToolbar({
+type SearchProps = Pick<Props,
+  | "entries"
+  | "sources"
+  | "sourceFilter"
+  | "query"
+  | "searchAriaLabel"
+  | "filterAriaLabel"
+  | "onQueryChange"
+  | "onSourceFilterChange"
+  | "printedOnly"
+  | "onPrintedOnlyChange"
+>;
+
+export function CreatureSearchControls({
   entries,
   sources,
   sourceFilter,
@@ -35,11 +50,9 @@ export function CreatureToolbar({
   filterAriaLabel,
   onQueryChange,
   onSourceFilterChange,
-  onManageSources,
-  onRefreshSources,
-  onAddCreature,
-  children,
-}: Props) {
+  printedOnly,
+  onPrintedOnlyChange,
+}: SearchProps) {
   const sourceCounts = new Map<string, number>();
   for (const entry of entries) {
     const key = entry.sourceId ?? MANUAL_SOURCE;
@@ -53,7 +66,6 @@ export function CreatureToolbar({
       : ALL_SOURCES;
 
   return (
-    <div className="creature-toolbar-actions">
       <CreatureSearch
         query={query}
         onQueryChange={onQueryChange}
@@ -62,6 +74,8 @@ export function CreatureToolbar({
         onFilterChange={(filter) => onSourceFilterChange(filter || null)}
         searchAriaLabel={searchAriaLabel}
         filterAriaLabel={filterAriaLabel}
+        printedOnly={printedOnly}
+        onPrintedOnlyChange={onPrintedOnlyChange}
         filterOptions={[
           { value: ALL_SOURCES, label: `All creatures (${entries.length})` },
           {
@@ -74,8 +88,21 @@ export function CreatureToolbar({
           })),
         ]}
       />
+  );
+}
+
+export function CreatureToolbar({
+  onManageSources,
+  onRefreshSources,
+  onAddCreature,
+  children,
+  ...searchProps
+}: Props) {
+  return (
+    <div className="creature-toolbar-actions">
+      <CreatureSearchControls {...searchProps} />
       <SourceToolbarActions
-        sources={sources}
+        sources={searchProps.sources}
         onManageSources={onManageSources}
         onRefreshSources={onRefreshSources}
       />

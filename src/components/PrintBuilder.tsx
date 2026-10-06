@@ -12,10 +12,12 @@ import {
   CircularProgress,
   createFilterOptions,
   Divider,
+  FormControlLabel,
   IconButton,
   InputBase,
   Menu,
   MenuItem,
+  Switch,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -78,6 +80,7 @@ interface Props {
   onSelectPrintCatalogue: (id: string | null) => void;
   onRenamePrintCatalogue: (name: string) => void;
   onDeletePrintCatalogue: () => void;
+  onPrintedChange: (printed: boolean) => void;
 }
 
 export function PrintBuilder({
@@ -109,6 +112,7 @@ export function PrintBuilder({
   onSelectPrintCatalogue,
   onRenamePrintCatalogue,
   onDeletePrintCatalogue,
+  onPrintedChange,
 }: Props) {
   const isMobile = useMediaQuery("(max-width: 640px)");
   const printRowHeight = isMobile
@@ -318,7 +322,7 @@ export function PrintBuilder({
           </WindowScroller>
         ) : entries.length === 0 ? (
           <div className="empty-state compact">
-            <h3>Add creatures to your binder first</h3>
+            <h3>Add creatures to your collection first</h3>
           </div>
         ) : (
           <div className="empty-state compact">
@@ -470,6 +474,18 @@ export function PrintBuilder({
               </MenuItem>
             </Menu>
           </div>
+          {activePrintCatalogue && (
+            <FormControlLabel
+              className="catalogue-printed-toggle"
+              label="This catalogue is printed"
+              control={
+                <Switch
+                  checked={activePrintCatalogue.printed}
+                  onChange={(_, checked) => onPrintedChange(checked)}
+                />
+              }
+            />
+          )}
           {activePrintCatalogue && renamingCatalogue && (
             <AppModal
               className="rename-catalogue-dialog"

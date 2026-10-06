@@ -26,6 +26,7 @@ import type {
 } from "./types";
 import { AddCreatureForm } from "./components/AddCreatureForm";
 import { AppModal } from "./components/AppModal";
+import { getPrintedEntries } from "./printedBinder";
 import { CreatureBinder } from "./components/CreatureBinder";
 import { CreaturePreviewDialog } from "./components/CreaturePreviewDialog";
 import { MiniFigStyle as MiniFigStylePanel } from "./components/MiniFigStyle";
@@ -71,7 +72,7 @@ import {
 } from "./storage";
 import "./App.css";
 
-type AppView = "binder" | "print" | "style" | "settings";
+type AppView = "collection" | "print" | "style" | "settings";
 type AppModalId = "add-creature" | "sources" | "quick-add";
 interface DriveSyncPayload {
   accessToken: string;
@@ -90,7 +91,7 @@ const SOURCE_QUERY_PARAM = "source";
 const CATALOGUE_QUERY_PARAM = "catalogue";
 const VIEW_QUERY_PARAM = "view";
 const APP_MODALS: AppModalId[] = ["add-creature", "sources", "quick-add"];
-const APP_VIEWS: AppView[] = ["binder", "print", "style", "settings"];
+const APP_VIEWS: AppView[] = ["collection", "print", "style", "settings"];
 const DRIVE_AUTOSYNC_DELAY_MS = 1000;
 
 function getModalFromUrl(): AppModalId | null {
@@ -106,9 +107,14 @@ function getPrintCatalogueFromUrl(): string | null {
   return new URL(window.location.href).searchParams.get(CATALOGUE_QUERY_PARAM);
 }
 
+function getPrintedOnlyFromUrl(): boolean {
+  const params = new URL(window.location.href).searchParams;
+  return params.get("printed") === "true" || params.get(VIEW_QUERY_PARAM) === "binder";
+}
+
 function getViewFromUrl(): AppView {
   const view = new URL(window.location.href).searchParams.get(VIEW_QUERY_PARAM);
-  return APP_VIEWS.includes(view as AppView) ? view as AppView : "binder";
+  return APP_VIEWS.includes(view as AppView) ? view as AppView : "collection";
 }
 
 function normalizeAsBinder(catalogues: Catalogue[]): Catalogue[] {
@@ -211,6 +217,7 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
     normalizeAsBinder(loadCatalogues()),
   );
   const [view, setView] = useState<AppView>(getViewFromUrl);
+  const [printedOnly, setPrintedOnly] = useState(getPrintedOnlyFromUrl);
   const [debugMenuAnchor, setDebugMenuAnchor] = useState<HTMLElement | null>(null);
   const [forcePlaceholders, setForcePlaceholders] = useState(false);
   const [activeModal, setActiveModal] = useState<AppModalId | null>(getModalFromUrl);
@@ -245,7 +252,7 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
     restoreDriveOnLoad
       ? "Restoring your Google Drive connection…"
       : googleDriveConfigured
-      ? "Connect your account to load your Drive binder and start autosync."
+      ? "Connect your account to load your Drive collection and start autosync."
       : "Set the Google client ID to enable Drive sync.",
   );
   const [driveAutosync, setDriveAutosync] = useState(false);
@@ -257,6 +264,14 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
   const driveRestoreAttempted = useRef(false);
 
   const entries = useMemo(() => catalogues[0]?.entries ?? [], [catalogues]);
+  const printedEntries = useMemo(
+    () => getPrintedEntries(entries, printCatalogues),
+    [entries, printCatalogues],
+  );
+  const collectionEntries = useMemo(() => {
+    const quantities = new Map(printedEntries.map((entry) => [entry.id, entry.quantity]));
+    return entries.map((entry) => ({ ...entry, quantity: quantities.get(entry.id) ?? 0 }));
+  }, [entries, printedEntries]);
   const activePrintCatalogue = useMemo(
     () =>
       printCatalogues.find(
@@ -299,15 +314,25 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
         url.searchParams.get(CATALOGUE_QUERY_PARAM),
       );
       setView(getViewFromUrl());
+      setPrintedOnly(getPrintedOnlyFromUrl());
     };
     window.addEventListener("popstate", syncNavigationFromHistory);
     return () => window.removeEventListener("popstate", syncNavigationFromHistory);
   }, []);
 
+  const changePrintedOnly = useCallback((checked: boolean) => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete(VIEW_QUERY_PARAM);
+    if (checked) url.searchParams.set("printed", "true");
+    else url.searchParams.delete("printed");
+    window.history.pushState(window.history.state, "", url);
+    setPrintedOnly(checked);
+  }, []);
+
   const changeView = useCallback((nextView: AppView) => {
     if (nextView === view) return;
     const url = new URL(window.location.href);
-    if (nextView === "binder") {
+    if (nextView === "collection") {
       url.searchParams.delete(VIEW_QUERY_PARAM);
     } else {
       url.searchParams.set(VIEW_QUERY_PARAM, nextView);
@@ -530,7 +555,7 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
       ),
     );
     if (duplicate) {
-      throw new Error("That source is already in your binder.");
+      throw new Error("That source is already in your collection.");
     }
     const source: CreatureSource = {
       ...draft,
@@ -667,6 +692,7 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
     const catalogue: PrintCatalogue = {
       id: crypto.randomUUID(),
       name: name.trim(),
+      printed: false,
       entries: Object.entries(activePrintQuantities).map(
         ([creatureId, quantity]) => ({ creatureId, quantity }),
       ),
@@ -709,6 +735,10 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
 
   const renamePrintCatalogue = useCallback((name: string) => {
     updateActivePrintCatalogue((catalogue) => ({ ...catalogue, name }));
+  }, [updateActivePrintCatalogue]);
+
+  const setCataloguePrinted = useCallback((printed: boolean) => {
+    updateActivePrintCatalogue((catalogue) => ({ ...catalogue, printed }));
   }, [updateActivePrintCatalogue]);
 
   const deletePrintCatalogue = useCallback(() => {
@@ -840,7 +870,7 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
         if (session !== driveSession.current) return;
 
         setDriveStatus("syncing");
-        setDriveMessage("Loading your binder from Drive…");
+        setDriveMessage("Loading your collection from Drive…");
         const remote = await loadCataloguesFromDrive(accessToken);
         if (session !== driveSession.current) return;
 
@@ -882,9 +912,9 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
             setMiniFigStyle(remote.miniFigStyle);
             saveMiniFigStyle(remote.miniFigStyle);
           }
-          setDriveMessage("Binder loaded from Drive. Autosync is on.");
+          setDriveMessage("Collection loaded from Drive. Autosync is on.");
         } else {
-          setDriveMessage("Creating your Drive binder…");
+          setDriveMessage("Creating your Drive collection…");
           const saved = await saveCataloguesToDrive(
             accessToken,
             catalogues,
@@ -903,7 +933,7 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
             miniFigStyle,
           );
           setCatalogues(savedCatalogues);
-          setDriveMessage("Drive binder created. Autosync is on.");
+          setDriveMessage("Drive collection created. Autosync is on.");
         }
 
         setDriveAccessToken(accessToken);
@@ -1010,7 +1040,7 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
       const backup = await downloadDriveBackup(driveAccessToken);
       if (session !== driveSession.current) return;
       if (!backup) {
-        throw new Error("No Drive binder backup exists yet.");
+        throw new Error("No Drive collection backup exists yet.");
       }
 
       const url = URL.createObjectURL(backup);
@@ -1193,7 +1223,7 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
       <header className="app-header">
         <div>
           <span className="eyebrow">Paper Mini Foundry</span>
-          <p className="subtitle">Build a reusable creature binder, then compose a print sheet.</p>
+          <p className="subtitle">Build your collection, compose print sheets, and track your printed miniatures.</p>
         </div>
         <div className="header-navigation">
           <Tabs
@@ -1202,7 +1232,7 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
             onChange={(_, nextView: AppView) => changeView(nextView)}
             aria-label="App sections"
           >
-            <Tab value="binder" label="Binder" />
+            <Tab value="collection" label="Collection" />
             <Tab value="print" label="Print" />
             <Tab
               value="style"
@@ -1287,10 +1317,12 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
 
       {view !== "settings" && !driveAccessToken && driveSyncPanel}
 
-      {view === "binder" ? (
+      {view === "collection" ? (
         <main className="binder-view">
           <CreatureBinder
-            entries={entries}
+            entries={collectionEntries}
+            printedOnly={printedOnly}
+            onPrintedOnlyChange={changePrintedOnly}
             sources={sources}
             sourceFilter={sourceFilter}
             forcePlaceholders={forcePlaceholders}
@@ -1339,6 +1371,7 @@ function App({ themeMode, onThemeModeChange }: AppProps) {
             onSelectPrintCatalogue={selectPrintCatalogue}
             onRenamePrintCatalogue={renamePrintCatalogue}
             onDeletePrintCatalogue={deletePrintCatalogue}
+            onPrintedChange={setCataloguePrinted}
           />
         </main>
       ) : view === "style" ? (

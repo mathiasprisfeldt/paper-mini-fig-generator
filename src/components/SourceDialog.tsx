@@ -344,7 +344,7 @@ export function SourceDialog({
         ) : (
           <div className="drive-source-setup">
             <div className="drive-source-copy">
-              <p>Select one folder from your Google Drive. Image files directly inside it become creatures in the binder.</p>
+              <p>Select one folder from your Google Drive. Image files directly inside it become creatures in the collection.</p>
             </div>
             <TextField size="small" label="Source name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Defaults to the folder name" />
             <TextField
