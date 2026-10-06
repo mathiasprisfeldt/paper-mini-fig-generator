@@ -11,6 +11,7 @@ import { SourceToolbarActions } from "./SourceToolbarActions";
 
 const ALL_SOURCES = "";
 const MANUAL_SOURCE = "manual";
+const PRINTED_FILTER = "printed-only";
 
 interface Props {
   entries: MiniFigEntry[];
@@ -27,9 +28,26 @@ interface Props {
   onRefreshSources: () => Promise<SourceRefreshResult>;
   onAddCreature: () => void;
   children?: ReactNode;
+  printedOnly?: boolean;
+  onPrintedOnlyChange?: (printedOnly: boolean) => void;
 }
 
-export function CreatureToolbar({
+type SearchProps = Pick<Props,
+  | "entries"
+  | "sources"
+  | "sourceFilter"
+  | "order"
+  | "onOrderChange"
+  | "query"
+  | "searchAriaLabel"
+  | "filterAriaLabel"
+  | "onQueryChange"
+  | "onSourceFilterChange"
+  | "printedOnly"
+  | "onPrintedOnlyChange"
+>;
+
+export function CreatureSearchControls({
   entries,
   sources,
   sourceFilter,
@@ -40,11 +58,9 @@ export function CreatureToolbar({
   filterAriaLabel,
   onQueryChange,
   onSourceFilterChange,
-  onManageSources,
-  onRefreshSources,
-  onAddCreature,
-  children,
-}: Props) {
+  printedOnly,
+  onPrintedOnlyChange,
+}: SearchProps) {
   const sourceCounts = new Map<string, number>();
   for (const entry of entries) {
     const key = entry.sourceId ?? MANUAL_SOURCE;
@@ -58,19 +74,25 @@ export function CreatureToolbar({
       : ALL_SOURCES;
 
   return (
-    <div className="creature-toolbar-actions">
       <CreatureSearch
         query={query}
         onQueryChange={onQueryChange}
         order={order}
         onOrderChange={onOrderChange}
-        activeFilter={activeSourceFilter}
+        activeFilter={printedOnly ? PRINTED_FILTER : activeSourceFilter}
         defaultFilter={ALL_SOURCES}
-        onFilterChange={(filter) => onSourceFilterChange(filter || null)}
+        onFilterChange={(filter) => {
+          onSourceFilterChange(filter === PRINTED_FILTER ? null : filter || null);
+          onPrintedOnlyChange?.(filter === PRINTED_FILTER);
+        }}
         searchAriaLabel={searchAriaLabel}
         filterAriaLabel={filterAriaLabel}
         filterOptions={[
           { value: ALL_SOURCES, label: `All creatures (${entries.length})` },
+          ...(onPrintedOnlyChange ? [{
+            value: PRINTED_FILTER,
+            label: `Printed only (${entries.filter((entry) => "quantity" in entry && typeof entry.quantity === "number" && entry.quantity > 0).length})`,
+          }] : []),
           {
             value: MANUAL_SOURCE,
             label: `Manually added (${sourceCounts.get(MANUAL_SOURCE) ?? 0})`,
@@ -81,8 +103,21 @@ export function CreatureToolbar({
           })),
         ]}
       />
+  );
+}
+
+export function CreatureToolbar({
+  onManageSources,
+  onRefreshSources,
+  onAddCreature,
+  children,
+  ...searchProps
+}: Props) {
+  return (
+    <div className="creature-toolbar-actions">
+      <CreatureSearchControls {...searchProps} />
       <SourceToolbarActions
-        sources={sources}
+        sources={searchProps.sources}
         onManageSources={onManageSources}
         onRefreshSources={onRefreshSources}
       />

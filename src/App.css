@@ -858,6 +858,23 @@
   gap: 2rem;
 }
 
+.section-toolbar .collection-printed-stats {
+  margin: 0;
+  margin-left: auto;
+  text-align: right;
+}
+
+.printed-quantity {
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.catalogue-printed-toggle .MuiFormControlLabel-label {
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
 .settings-view {
   display: grid;
   width: 100%;

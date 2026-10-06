@@ -26,8 +26,12 @@ import {
   MenuItem,
 } from "@mui/material";
 
+type BinderEntry = MiniFigEntry & { quantity?: number };
+
 interface Props {
-  entries: MiniFigEntry[];
+  entries: BinderEntry[];
+  printedOnly: boolean;
+  onPrintedOnlyChange: (printedOnly: boolean) => void;
   forcePlaceholders: boolean;
   imageRetryKey: string;
   sources: CreatureSource[];
@@ -49,13 +53,13 @@ const GRID_GAP = 8;
 const INITIAL_ROW_HEIGHT_ESTIMATE = 290;
 
 interface CreatureBinderCardProps {
-  entry: MiniFigEntry;
+  entry: BinderEntry;
   entryIndex: number;
   entriesCount: number;
   forcePlaceholders: boolean;
   imageRetryKey: string;
   loadedImageKeys: Set<string>;
-  onRemove: (id: string) => void;
+  onRemove?: (id: string) => void;
   onPreview: (id: string) => void;
 }
 
@@ -78,7 +82,7 @@ const CreatureBinderCard = memo(function CreatureBinderCard({
       aria-posinset={entryIndex + 1}
       aria-setsize={entriesCount}
     >
-      {!entry.sourceId && (
+      {onRemove && !entry.sourceId && (
         <IconButton
           className="binder-card-menu-button"
           aria-label={`Actions for ${entry.name || "unnamed creature"}`}
@@ -111,6 +115,9 @@ const CreatureBinderCard = memo(function CreatureBinderCard({
         <strong className="binder-creature-title">
           {entry.name || "Unnamed creature"}
         </strong>
+        {entry.quantity !== undefined && (
+          <span className="printed-quantity">{entry.quantity} printed</span>
+        )}
       </div>
       <Menu
         id={`creature-actions-${entry.id}`}
@@ -124,7 +131,7 @@ const CreatureBinderCard = memo(function CreatureBinderCard({
           className="binder-remove-menu-item"
           onClick={() => {
             setMenuAnchor(null);
-            onRemove(entry.id);
+            onRemove?.(entry.id);
           }}
         >
           Remove
@@ -135,14 +142,14 @@ const CreatureBinderCard = memo(function CreatureBinderCard({
 });
 
 interface BinderGridRowProps {
-  entries: MiniFigEntry[];
+  entries: BinderEntry[];
   rowIndex: number;
   columnCount: number;
   entriesCount: number;
   forcePlaceholders: boolean;
   imageRetryKey: string;
   loadedImageKeys: Set<string>;
-  onRemove: (id: string) => void;
+  onRemove?: (id: string) => void;
   onPreview: (id: string) => void;
   onHeightChange: (rowIndex: number, height: number) => void;
 }
@@ -201,19 +208,19 @@ function BinderGridRow({
 }
 
 interface BinderVirtualizedGridProps {
-  entries: MiniFigEntry[];
+  entries: BinderEntry[];
   forcePlaceholders: boolean;
   imageRetryKey: string;
   height: number;
   isScrolling: boolean;
   onChildScroll: (params: { scrollTop: number }) => void;
   onPreview: (id: string) => void;
-  onRemove: (id: string) => void;
+  onRemove?: (id: string) => void;
   scrollTop: number;
   width: number;
 }
 
-function BinderVirtualizedGrid({
+export function BinderVirtualizedGrid({
   entries,
   forcePlaceholders,
   imageRetryKey,
@@ -237,7 +244,7 @@ function BinderVirtualizedGrid({
     Math.floor((width + GRID_GAP) / (CARD_MIN_WIDTH + GRID_GAP)),
   );
   const rows = useMemo(() => {
-    const nextRows: MiniFigEntry[][] = [];
+    const nextRows: BinderEntry[][] = [];
     for (let index = 0; index < entries.length; index += columnCount) {
       nextRows.push(entries.slice(index, index + columnCount));
     }
@@ -315,6 +322,8 @@ function BinderVirtualizedGrid({
 
 export function CreatureBinder({
   entries,
+  printedOnly,
+  onPrintedOnlyChange,
   forcePlaceholders,
   imageRetryKey,
   sources,
@@ -347,12 +356,14 @@ export function CreatureBinder({
           (activeSourceFilter === MANUAL_SOURCE
             ? !entry.sourceId
             : entry.sourceId === activeSourceFilter);
-        return matchesQuery && matchesSource;
+        return matchesQuery && matchesSource && (!printedOnly || (entry.quantity ?? 0) > 0);
       }),
       sources,
       order,
     );
-  }, [activeSourceFilter, entries, order, query, sources]);
+  }, [activeSourceFilter, entries, order, printedOnly, query, sources]);
+  const totalPrinted = entries.reduce((sum, entry) => sum + (entry.quantity ?? 0), 0);
+  const printedKinds = entries.filter((entry) => (entry.quantity ?? 0) > 0).length;
 
   return (
     <>
@@ -367,12 +378,18 @@ export function CreatureBinder({
           query={query}
           onQueryChange={setQuery}
           searchAriaLabel="Search creatures"
-          filterAriaLabel="Filter creatures by source"
+          filterAriaLabel="Filter creatures"
+          printedOnly={printedOnly}
+          onPrintedOnlyChange={onPrintedOnlyChange}
           onSourceFilterChange={onSourceFilterChange}
           onManageSources={onManageSources}
           onRefreshSources={onRefreshSources}
           onAddCreature={onAddCreature}
-        />
+        >
+          <p className="collection-printed-stats">
+            {totalPrinted} printed miniature{totalPrinted === 1 ? "" : "s"} · {printedKinds} creature{printedKinds === 1 ? "" : "s"}
+          </p>
+        </CreatureToolbar>
       </div>
 
       {visibleEntries.length > 0 ? (
@@ -406,7 +423,7 @@ export function CreatureBinder({
       ) : (
         <div className="empty-state">
           <span>◇</span>
-          <h3>{entries.length ? "No matching creatures" : "Your binder is empty"}</h3>
+          <h3>{entries.length ? "No matching creatures" : "Your collection is empty"}</h3>
           <p>{entries.length ? "Try another search or source filter." : "Add a creature manually or connect an HTML source."}</p>
         </div>
       )}

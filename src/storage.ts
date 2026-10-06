@@ -161,6 +161,7 @@ export function migratePrintCatalogue(value: unknown): PrintCatalogue | null {
   return {
     id: raw.id,
     name: raw.name,
+    printed: raw.printed === true,
     entries,
     paperFormat: VALID_PAPER_FORMATS.includes(raw.paperFormat as PaperFormat)
       ? raw.paperFormat as PaperFormat

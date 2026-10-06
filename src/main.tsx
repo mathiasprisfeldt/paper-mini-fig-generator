@@ -8,6 +8,11 @@ import { createAppTheme } from "./theme.ts";
 import { getThemeMode, setThemeMode as saveThemeMode } from "./storage.ts";
 import type { ThemeMode } from "./types.ts";
 
+if (import.meta.env.DEV && ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)) {
+  const { seedLocalMockData } = await import("./mockData.ts");
+  seedLocalMockData();
+}
+
 export function AppShell() {
   const [themeMode, setThemeModeState] = useState<ThemeMode>(getThemeMode);
   const [systemPrefersDark, setSystemPrefersDark] = useState(

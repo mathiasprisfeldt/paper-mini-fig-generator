@@ -168,7 +168,7 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
 
   const handleAdd = async () => {
     if (sourceMode === "upload" && !uploadEnabled) {
-      setError("Connect Google Drive and load or save your binder before uploading images.");
+      setError("Connect Google Drive and load or save your collection before uploading images.");
       return;
     }
     if (!name.trim()) {
@@ -217,7 +217,7 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
       <div className="panel-heading">
         <div>
           <span className="eyebrow">New creature</span>
-          <h2>Add to your binder</h2>
+          <h2>Add to your collection</h2>
         </div>
         <ToggleButtonGroup
           className="source-tabs"
@@ -226,7 +226,7 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
           onChange={(_, val: "upload" | "url" | null) => {
             if (!val) return;
             if (val === "upload" && !uploadEnabled) {
-              setError("Connect Google Drive and load or save your binder before uploading images.");
+              setError("Connect Google Drive and load or save your collection before uploading images.");
               return;
             }
             setSourceMode(val);
@@ -378,7 +378,7 @@ export function AddCreatureForm({ uploadEnabled, onAdd, onCancel }: Props) {
           id="upload-drive-requirement"
           sx={{ mt: 1, fontSize: "0.75rem", lineHeight: 1.45 }}
         >
-          <strong>Google Drive required for uploads.</strong> Connect Drive, then load or save your binder to enable autosync. Image links can still be added without Drive.
+          <strong>Google Drive required for uploads.</strong> Connect Drive, then load or save your collection to enable autosync. Image links can still be added without Drive.
         </Alert>
       )}
       {sourceMode === "url" && (

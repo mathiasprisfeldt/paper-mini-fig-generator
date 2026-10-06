@@ -46,6 +46,7 @@ export interface PrintCatalogueEntry {
 export interface PrintCatalogue {
   id: string;
   name: string;
+  printed: boolean;
   entries: PrintCatalogueEntry[];
   paperFormat: PaperFormat;
   printLayout: PrintLayout;
