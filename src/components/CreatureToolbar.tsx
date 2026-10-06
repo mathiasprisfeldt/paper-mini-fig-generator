@@ -11,6 +11,7 @@ import { SourceToolbarActions } from "./SourceToolbarActions";
 
 const ALL_SOURCES = "";
 const MANUAL_SOURCE = "manual";
+const PRINTED_FILTER = "printed-only";
 
 interface Props {
   entries: MiniFigEntry[];
@@ -78,15 +79,20 @@ export function CreatureSearchControls({
         onQueryChange={onQueryChange}
         order={order}
         onOrderChange={onOrderChange}
-        activeFilter={activeSourceFilter}
+        activeFilter={printedOnly ? PRINTED_FILTER : activeSourceFilter}
         defaultFilter={ALL_SOURCES}
-        onFilterChange={(filter) => onSourceFilterChange(filter || null)}
+        onFilterChange={(filter) => {
+          onSourceFilterChange(filter === PRINTED_FILTER ? null : filter || null);
+          onPrintedOnlyChange?.(filter === PRINTED_FILTER);
+        }}
         searchAriaLabel={searchAriaLabel}
         filterAriaLabel={filterAriaLabel}
-        printedOnly={printedOnly}
-        onPrintedOnlyChange={onPrintedOnlyChange}
         filterOptions={[
           { value: ALL_SOURCES, label: `All creatures (${entries.length})` },
+          ...(onPrintedOnlyChange ? [{
+            value: PRINTED_FILTER,
+            label: `Printed only (${entries.filter((entry) => "quantity" in entry && typeof entry.quantity === "number" && entry.quantity > 0).length})`,
+          }] : []),
           {
             value: MANUAL_SOURCE,
             label: `Manually added (${sourceCounts.get(MANUAL_SOURCE) ?? 0})`,
