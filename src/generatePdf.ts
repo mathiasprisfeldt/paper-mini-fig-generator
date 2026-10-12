@@ -676,7 +676,10 @@ async function buildPdf(
   );
   if (validEntries.length === 0) return null;
 
-  const { widthMm: pageW, heightMm: pageH } = PAPER_SIZES[format];
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format });
+  // Use the PDF's actual media box for placement, including its precision.
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
   const usableW = pageW - PAGE_MARGIN_MM * 2;
   const usableH = pageH - PAGE_MARGIN_MM * 2;
 
@@ -741,7 +744,6 @@ async function buildPdf(
 
   miniGroups.sort((a, b) => a[0].name.localeCompare(b[0].name));
 
-  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format });
   await ensureJsPdfFont(pdf);
 
   if (layout === "center-fold") {
